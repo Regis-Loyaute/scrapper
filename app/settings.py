@@ -90,6 +90,23 @@ class Settings(BaseSettings):
     )
     debug: bool = Field(alias='DEBUG', default=False, description='Enable debug mode')
 
+    # crawler settings
+    crawl_max_concurrency: PositiveInt = Field(
+        alias='CRAWL_MAX_CONCURRENCY', default=8, description='Maximum crawl concurrency limit'
+    )
+    crawl_default_rate_per_domain: float = Field(
+        alias='CRAWL_DEFAULT_RATE_PER_DOMAIN', default=1.0, description='Default requests per second per domain'
+    )
+    crawl_hard_page_limit: PositiveInt = Field(
+        alias='CRAWL_HARD_PAGE_LIMIT', default=5000, description='Hard limit on pages per crawl job'
+    )
+    crawl_hard_duration_sec: PositiveInt = Field(
+        alias='CRAWL_HARD_DURATION_SEC', default=43200, description='Hard limit on crawl duration (12 hours)'
+    )
+    crawl_enable_asset_capture: bool = Field(
+        alias='CRAWL_ENABLE_ASSET_CAPTURE', default=True, description='Enable asset capture feature'
+    )
+
     # version settings
     git_tag: str = Field(alias='GIT_TAG', default='v0.0.0')
     git_sha: str = Field(alias='GIT_SHA', default='')
@@ -157,6 +174,13 @@ SSL_CIPHERS = _settings.ssl_ciphers
 WORKERS = _settings.workers
 DEBUG = _settings.debug
 
+# crawler settings
+CRAWL_MAX_CONCURRENCY = _settings.crawl_max_concurrency
+CRAWL_DEFAULT_RATE_PER_DOMAIN = _settings.crawl_default_rate_per_domain
+CRAWL_HARD_PAGE_LIMIT = _settings.crawl_hard_page_limit
+CRAWL_HARD_DURATION_SEC = _settings.crawl_hard_duration_sec
+CRAWL_ENABLE_ASSET_CAPTURE = _settings.crawl_enable_asset_capture
+
 
 # other settings
 @cache
@@ -203,6 +227,13 @@ def to_string() -> str:
         ],
         'SSL settings': ['ssl_keyfile', 'ssl_keyfile_password', 'ssl_certfile', 'ssl_ciphers'],
         'Uvicorn settings': ['workers', 'debug'],
+        'Crawler settings': [
+            'crawl_max_concurrency',
+            'crawl_default_rate_per_domain', 
+            'crawl_hard_page_limit',
+            'crawl_hard_duration_sec',
+            'crawl_enable_asset_capture'
+        ],
         'Version info': ['git_tag', 'git_sha'],
     }
 

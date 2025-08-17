@@ -1,0 +1,126 @@
+{% extends "library/base.html" %}
+
+{% block title %}Website Library - Scrapper{% endblock %}
+
+{% block content %}
+<div class="library-nav">
+  <ul>
+    <li><a href="/library" class="current">All Domains</a></li>
+  </ul>
+</div>
+
+<header>
+  <h1>📚 Website Library</h1>
+  <p>Browse and search your collection of crawled websites</p>
+</header>
+
+<div class="search-box">
+  <form id="search-form">
+    <div class="grid">
+      <div>
+        <input type="text" id="search-query" placeholder="Search pages by title or content...">
+      </div>
+      <div>
+        <select id="domain-filter">
+          <option value="">All domains</option>
+          {% for domain in domains %}
+          <option value="{{ domain.name }}">{{ domain.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <button type="submit">Search</button>
+      </div>
+    </div>
+  </form>
+</div>
+
+<div id="search-results" class="search-results" style="display: none;">
+  <h3>Search Results</h3>
+  <div id="results-container"></div>
+</div>
+
+<div id="domains-list">
+  {% if domains %}
+    <h2>Downloaded Websites ({{ domains|length }})</h2>
+    
+    {% for domain in domains %}
+    <div class="domain-card">
+      <h3><a href="/library/domain/{{ domain.name }}">🌐 {{ domain.name }}</a></h3>
+      <p>
+        <strong>{{ domain.crawl_count }}</strong> 
+        {% if domain.crawl_count == 1 %}crawl{% else %}crawls{% endif %} available
+      </p>
+      <div class="meta-info">
+        <span>Last updated: {{ domain.last_modified|int|datetime }}</span>
+      </div>
+    </div>
+    {% endfor %}
+  {% else %}
+    <div style="text-align: center; padding: 3rem;">
+      <h2>📭 No Websites Downloaded Yet</h2>
+      <p>Your crawled websites will appear here once you start crawling.</p>
+      <p><a href="/" role="button">Start Scraping</a></p>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('search-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  
+  const query = document.getElementById('search-query').value.trim();
+  const domain = document.getElementById('domain-filter').value;
+  
+  if (!query) {
+    return;
+  }
+  
+  const resultsDiv = document.getElementById('search-results');
+  const resultsContainer = document.getElementById('results-container');
+  const domainsList = document.getElementById('domains-list');
+  
+  try {
+    resultsContainer.innerHTML = '<p>Searching...</p>';
+    resultsDiv.style.display = 'block';
+    domainsList.style.display = 'none';
+    
+    const params = new URLSearchParams({ q: query });
+    if (domain) params.append('domain', domain);
+    
+    const response = await fetch(`/library/api/search?${params}`);
+    const data = await response.json();
+    
+    if (data.results && data.results.length > 0) {
+      resultsContainer.innerHTML = data.results.map(result => `
+        <div class="page-card">
+          <h4><a href="/library/page/${result.domain}/${result.folder}/${result.file_id}">${result.title}</a></h4>
+          <p><a href="${result.url}" target="_blank" class="secondary">${result.url}</a></p>
+          <div class="snippet">${result.snippet}</div>
+          <div class="meta-info">
+            <span>Domain: ${result.domain}</span> •
+            <span>${result.timestamp}</span>
+          </div>
+        </div>
+      `).join('');
+    } else {
+      resultsContainer.innerHTML = '<p>No results found.</p>';
+    }
+    
+  } catch (error) {
+    resultsContainer.innerHTML = '<p style="color: var(--del-color);">Search error. Please try again.</p>';
+  }
+});
+
+// Add datetime filter for Jinja2
+document.addEventListener('DOMContentLoaded', function() {
+  // Convert timestamps to readable dates
+  document.querySelectorAll('[data-timestamp]').forEach(el => {
+    const timestamp = parseInt(el.dataset.timestamp);
+    el.textContent = new Date(timestamp * 1000).toLocaleDateString();
+  });
+});
+</script>
+{% endblock %}

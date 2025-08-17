@@ -1,0 +1,1 @@
+{"detail":[{"type":"url_parsing","loc":["query","url"],"msg":"Invalid URL","input":"invalid-url"}]}

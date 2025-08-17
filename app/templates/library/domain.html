@@ -1,0 +1,60 @@
+{% extends "library/base.html" %}
+
+{% block title %}{{ domain_name }} - Website Library{% endblock %}
+
+{% block content %}
+<div class="library-nav">
+  <ul>
+    <li><a href="/library">All Domains</a></li>
+    <li><a href="/library/domain/{{ domain_name }}" class="current">{{ domain_name }}</a></li>
+  </ul>
+</div>
+
+<div class="breadcrumb">
+  <a href="/library">Library</a> / <strong>{{ domain_name }}</strong>
+</div>
+
+<header>
+  <h1>🌐 {{ domain_name }}</h1>
+  <p>{{ crawls|length }} 
+    {% if crawls|length == 1 %}crawl{% else %}crawls{% endif %} 
+    available for this domain
+  </p>
+</header>
+
+{% if crawls %}
+  {% for crawl in crawls %}
+  <div class="crawl-card">
+    <h3>
+      <a href="/library/crawl/{{ domain_name }}/{{ crawl.folder_name }}">
+        📄 {{ crawl.url }}
+      </a>
+    </h3>
+    
+    <div class="grid">
+      <div>
+        <span class="status-badge status-{{ crawl.status }}">{{ crawl.status }}</span>
+      </div>
+      <div>
+        <strong>{{ crawl.pages_count }}</strong> pages
+      </div>
+      <div>
+        <strong>{{ "%.1f"|format(crawl.size_mb) }}</strong> MB
+      </div>
+    </div>
+    
+    <div class="meta-info">
+      <span>Created: {{ crawl.created_at[:19] }}</span> •
+      <span>Job ID: {{ crawl.job_id[:8] }}...</span> •
+      <span>Folder: {{ crawl.folder_name }}</span>
+    </div>
+  </div>
+  {% endfor %}
+{% else %}
+  <div style="text-align: center; padding: 3rem;">
+    <h2>📭 No Crawls Found</h2>
+    <p>No crawls found for {{ domain_name }}.</p>
+    <p><a href="/library" role="button" class="secondary">Back to Library</a></p>
+  </div>
+{% endif %}
+{% endblock %}

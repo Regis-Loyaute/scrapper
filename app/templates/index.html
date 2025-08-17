@@ -11,6 +11,40 @@
   <link rel="stylesheet" href="/static/pico/1.5.7/pico.min.css">
   <link rel="stylesheet" href="/static/custom.css">
   <title>Scrapper</title>
+  <style>
+    .progress-container {
+      background: var(--card-background-color);
+      border: 1px solid var(--muted-border-color);
+      border-radius: 0.5rem;
+      padding: 1.5rem;
+      margin: 1rem 0;
+    }
+    .progress-info {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+    .progress-bar {
+      background: var(--muted-color);
+      border-radius: 4px;
+      height: 8px;
+      margin: 1rem 0;
+      overflow: hidden;
+    }
+    .progress-actions {
+      display: flex;
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+    .crawl-it {
+      background: var(--primary) !important;
+      color: white !important;
+    }
+    .crawl-it:hover {
+      background: var(--primary-hover) !important;
+    }
+  </style>
   <link rel="icon" href="/favicon.ico" sizes="any"><!-- 32×32 -->
   <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png"><!-- 180×180 -->
   <link rel="manifest" href="/static/icons/site.webmanifest">
@@ -30,6 +64,7 @@
       </li>
     </ul>
     <ul>
+      <li><a href="/library" class="contrast">📚 Library</a></li>
       <li>
         <a href="https://github.com/amerkurev/scrapper" class="contrast" aria-label="Scrapper GitHub repository">
           <svg aria-hidden="true" focusable="false" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512" height="16px"><path fill="currentColor" d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"></path></svg>
@@ -53,7 +88,8 @@
         <div id="errors" class="errors">
         </div>
         <p>
-          <a href="" role="button" class="contrast outline scrape-it" aria-label="scrape-it" id="scrape-it">Scrape it</a>
+          <a href="" role="button" class="contrast outline scrape-it" aria-label="scrape-it" id="scrape-it">📄 Scrape Page</a>
+          <a href="" role="button" class="primary crawl-it" aria-label="crawl-it" id="crawl-it">🕷️ Crawl Website</a>
           <select id="select-route" class="select-route" required onchange="location = this.value;">
             {% if request.url.path == '/links' %}
             <option value="/">Article</option>
@@ -65,9 +101,66 @@
           </select>
         </p>
         <br>
+        
+        <!-- Crawl Options -->
+        <div id="crawl-options" style="display: none;">
+          <details open="">
+            <summary>Crawl Options</summary>
+            <div class="grid">
+              <div>
+                <label for="max-pages">Max Pages</label>
+                <input type="number" id="max-pages" value="50" min="1" max="1000">
+              </div>
+              <div>
+                <label for="max-depth">Max Depth</label>
+                <input type="number" id="max-depth" value="3" min="1" max="10">
+              </div>
+              <div>
+                <label for="rate-limit">Rate Limit (req/sec)</label>
+                <input type="number" id="rate-limit" value="1.0" min="0.1" max="5.0" step="0.1">
+              </div>
+            </div>
+            <div class="grid">
+              <div>
+                <label for="crawl-scope">Scope</label>
+                <select id="crawl-scope">
+                  <option value="domain" selected>Same Domain</option>
+                  <option value="host">Same Host</option>
+                  <option value="path">Same Path</option>
+                </select>
+              </div>
+              <div>
+                <label>Options</label>
+                <label><input type="checkbox" id="respect-robots" checked> Respect robots.txt</label>
+              </div>
+            </div>
+          </details>
+        </div>
+
+        <!-- Progress Section -->
+        <div id="crawl-progress" style="display: none;">
+          <div class="progress-container">
+            <h4>🕷️ Crawling in Progress</h4>
+            <div class="progress-info">
+              <div><strong>Job ID:</strong> <span id="job-id">-</span></div>
+              <div><strong>Status:</strong> <span id="crawl-status">Starting...</span></div>
+              <div><strong>Pages Found:</strong> <span id="pages-found">0</span></div>
+              <div><strong>Pages Crawled:</strong> <span id="pages-crawled">0</span></div>
+              <div><strong>Elapsed:</strong> <span id="elapsed-time">0s</span></div>
+            </div>
+            <div class="progress-bar">
+              <div id="progress-fill" style="width: 0%; background: var(--primary); height: 8px; border-radius: 4px; transition: width 0.3s;"></div>
+            </div>
+            <div class="progress-actions">
+              <button id="view-library" style="display: none;">📚 View in Library</button>
+              <button id="stop-crawl" class="secondary">⏹️ Stop Crawl</button>
+            </div>
+          </div>
+        </div>
+
         <div>
           <details id="query-params-details" open="">
-            <summary>Request Parameters</summary>
+            <summary>Request Parameters (Single Page Scraping)</summary>
             <textarea id="query-params" rows="10" cols="50" placeholder="{{ for_example|safe }}"></textarea>
             <summary><small><a href="/docs/" target="_blank">Swagger Docs</a></small></summary>
           </details>
@@ -101,6 +194,169 @@
     {% else %}
     var apiEndpoint = "/api/article";
     {% endif %}
+    
+    let currentCrawlJob = null;
+    let progressInterval = null;
+    
+    // Button event handlers
+    document.getElementById('crawl-it').addEventListener('click', function(e) {
+      e.preventDefault();
+      startCrawling();
+    });
+    
+    // Show/hide crawl options based on button hover/click
+    document.getElementById('crawl-it').addEventListener('click', function() {
+      document.getElementById('crawl-options').style.display = 'block';
+      document.getElementById('query-params-details').style.display = 'none';
+    });
+    
+    document.getElementById('scrape-it').addEventListener('click', function() {
+      document.getElementById('crawl-options').style.display = 'none';
+      document.getElementById('query-params-details').style.display = 'block';
+      // Hide crawl progress when using regular scraping
+      document.getElementById('crawl-progress').style.display = 'none';
+    });
+    
+    async function startCrawling() {
+      const urlInput = document.getElementById('url');
+      const url = urlInput.value.trim();
+      
+      if (!url) {
+        showError('Please enter a URL');
+        return;
+      }
+      
+      // Get crawl options
+      const maxPages = document.getElementById('max-pages').value;
+      const maxDepth = document.getElementById('max-depth').value;
+      const rateLimit = document.getElementById('rate-limit').value;
+      const scope = document.getElementById('crawl-scope').value;
+      const respectRobots = document.getElementById('respect-robots').checked;
+      
+      // Show progress section
+      document.getElementById('crawl-progress').style.display = 'block';
+      document.getElementById('crawl-status').textContent = 'Starting...';
+      document.getElementById('pages-found').textContent = '0';
+      document.getElementById('pages-crawled').textContent = '0';
+      document.getElementById('elapsed-time').textContent = '0s';
+      document.getElementById('progress-fill').style.width = '0%';
+      document.getElementById('view-library').style.display = 'none';
+      
+      try {
+        // Start crawl job
+        const response = await fetch('/api/crawl/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            start_url: url,
+            max_pages: parseInt(maxPages),
+            max_duration: 3600, // 1 hour
+            scope: scope,
+            rate_limit: parseFloat(rateLimit),
+            respect_robots: respectRobots
+          })
+        });
+        
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.detail || 'Failed to start crawl');
+        }
+        
+        const result = await response.json();
+        currentCrawlJob = result.job_id;
+        
+        document.getElementById('job-id').textContent = result.job_id.substring(0, 8) + '...';
+        document.getElementById('crawl-status').textContent = result.status;
+        
+        // Start progress monitoring
+        startProgressMonitoring();
+        
+      } catch (error) {
+        showError('Error starting crawl: ' + error.message);
+        document.getElementById('crawl-progress').style.display = 'none';
+      }
+    }
+    
+    function startProgressMonitoring() {
+      const startTime = Date.now();
+      
+      progressInterval = setInterval(async () => {
+        if (!currentCrawlJob) return;
+        
+        try {
+          const response = await fetch(`/api/crawl/${currentCrawlJob}`);
+          if (!response.ok) return;
+          
+          const job = await response.json();
+          
+          // Update UI
+          document.getElementById('crawl-status').textContent = job.status || 'Unknown';
+          document.getElementById('pages-found').textContent = job.pages_found || '0';
+          document.getElementById('pages-crawled').textContent = job.pages_crawled || '0';
+          
+          // Update elapsed time
+          const elapsed = Math.floor((Date.now() - startTime) / 1000);
+          document.getElementById('elapsed-time').textContent = elapsed + 's';
+          
+          // Update progress bar
+          const progress = job.pages_found > 0 ? (job.pages_crawled / job.pages_found) * 100 : 0;
+          document.getElementById('progress-fill').style.width = Math.min(progress, 100) + '%';
+          
+          // Check if crawl is finished
+          if (job.status === 'done' || job.status === 'error' || job.status === 'canceled') {
+            clearInterval(progressInterval);
+            progressInterval = null;
+            
+            if (job.status === 'done') {
+              document.getElementById('crawl-status').textContent = '✅ Completed';
+              document.getElementById('view-library').style.display = 'inline-block';
+              document.getElementById('stop-crawl').style.display = 'none';
+            } else {
+              document.getElementById('crawl-status').textContent = '❌ ' + job.status;
+            }
+          }
+          
+        } catch (error) {
+          console.error('Error monitoring progress:', error);
+        }
+      }, 2000); // Update every 2 seconds
+    }
+    
+    // Stop crawl functionality
+    document.getElementById('stop-crawl').addEventListener('click', async function() {
+      if (!currentCrawlJob) return;
+      
+      try {
+        const response = await fetch(`/api/crawl/jobs/${currentCrawlJob}/stop`, {
+          method: 'POST'
+        });
+        
+        if (response.ok) {
+          clearInterval(progressInterval);
+          document.getElementById('crawl-status').textContent = '⏹️ Stopped';
+          this.style.display = 'none';
+        }
+      } catch (error) {
+        console.error('Error stopping crawl:', error);
+      }
+    });
+    
+    // View in library
+    document.getElementById('view-library').addEventListener('click', function() {
+      window.open('/library/', '_blank');
+    });
+    
+    function showError(message) {
+      const errorDiv = document.getElementById('errors');
+      errorDiv.innerHTML = `<div style="color: var(--del-color); margin: 1rem 0;">${message}</div>`;
+      setTimeout(() => {
+        errorDiv.innerHTML = '';
+      }, 5000);
+    }
+    
+    // Note: Single page scraping is handled by the existing query.js
   </script>
   <script src="/static/query.js"></script>
 </body>

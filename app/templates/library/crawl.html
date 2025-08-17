@@ -1,0 +1,159 @@
+{% extends "library/base.html" %}
+
+{% block title %}{{ manifest.params.url }} - Crawl Details{% endblock %}
+
+{% block content %}
+<div class="library-nav">
+  <ul>
+    <li><a href="/library">All Domains</a></li>
+    <li><a href="/library/domain/{{ domain_name }}">{{ domain_name }}</a></li>
+    <li><a href="/library/crawl/{{ domain_name }}/{{ folder_name }}" class="current">{{ folder_name }}</a></li>
+  </ul>
+</div>
+
+<div class="breadcrumb">
+  <a href="/library">Library</a> / 
+  <a href="/library/domain/{{ domain_name }}">{{ domain_name }}</a> / 
+  <strong>{{ folder_name }}</strong>
+</div>
+
+<header>
+  <h1>📄 Crawl Details</h1>
+  <p><a href="{{ manifest.params.url }}" target="_blank">{{ manifest.params.url }}</a></p>
+</header>
+
+<div class="grid">
+  <div>
+    <h3>Crawl Information</h3>
+    <table>
+      <tbody>
+        <tr>
+          <td><strong>Status:</strong></td>
+          <td><span class="status-badge status-{{ manifest.status.state }}">{{ manifest.status.state }}</span></td>
+        </tr>
+        <tr>
+          <td><strong>Created:</strong></td>
+          <td>{{ manifest.created_at[:19] }}</td>
+        </tr>
+        <tr>
+          <td><strong>Started:</strong></td>
+          <td>{{ manifest.status.started_at[:19] if manifest.status.started_at else 'Not started' }}</td>
+        </tr>
+        <tr>
+          <td><strong>Finished:</strong></td>
+          <td>{{ manifest.status.finished_at[:19] if manifest.status.finished_at else 'Not finished' }}</td>
+        </tr>
+        <tr>
+          <td><strong>Job ID:</strong></td>
+          <td><code>{{ manifest.job_id }}</code></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  
+  <div>
+    <h3>Crawl Statistics</h3>
+    <table>
+      <tbody>
+        <tr>
+          <td><strong>Pages Visited:</strong></td>
+          <td>{{ manifest.status.stats.visited }}</td>
+        </tr>
+        <tr>
+          <td><strong>Pages Found:</strong></td>
+          <td>{{ manifest.status.stats.enqueued }}</td>
+        </tr>
+        <tr>
+          <td><strong>Success:</strong></td>
+          <td>{{ manifest.status.stats.ok }}</td>
+        </tr>
+        <tr>
+          <td><strong>Failed:</strong></td>
+          <td>{{ manifest.status.stats.failed }}</td>
+        </tr>
+        <tr>
+          <td><strong>Skipped:</strong></td>
+          <td>{{ manifest.status.stats.skipped }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% if manifest.status.last_error %}
+<div style="background: var(--del-color); color: white; padding: 1rem; border-radius: 0.5rem; margin: 1rem 0;">
+  <strong>Error:</strong> {{ manifest.status.last_error }}
+</div>
+{% endif %}
+
+<h2>Crawled Pages ({{ pages|length }})</h2>
+
+{% if pages %}
+  <div style="margin-bottom: 1rem;">
+    <input type="text" id="page-filter" placeholder="Filter pages by title or URL..." style="width: 100%;">
+  </div>
+  
+  <div id="pages-container">
+    {% for page in pages %}
+    <div class="page-card" data-searchable="{{ (page.title + ' ' + page.url)|lower }}">
+      <div class="grid">
+        <div>
+          <h4>
+            <a href="/library/page/{{ domain_name }}/{{ folder_name }}/{{ page.file_id }}">
+              {{ page.title }}
+            </a>
+          </h4>
+          <p><a href="{{ page.url }}" target="_blank" class="secondary">{{ page.url }}</a></p>
+        </div>
+        <div style="text-align: right;">
+          {% if page.ok %}
+            <span class="status-badge status-done">✓ OK</span>
+          {% else %}
+            <span class="status-badge status-error">✗ Error</span>
+          {% endif %}
+          <br>
+          <small>Depth: {{ page.depth }}</small>
+          {% if page.length %}
+            <br><small>{{ page.length }} chars</small>
+          {% endif %}
+        </div>
+      </div>
+      {% if not page.ok and page.status_code %}
+        <div class="meta-info" style="color: var(--del-color);">
+          HTTP {{ page.status_code }}
+        </div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+{% else %}
+  <div style="text-align: center; padding: 2rem;">
+    <p>No pages found in this crawl.</p>
+  </div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const filterInput = document.getElementById('page-filter');
+  const pagesContainer = document.getElementById('pages-container');
+  
+  if (filterInput && pagesContainer) {
+    filterInput.addEventListener('input', function() {
+      const filterValue = this.value.toLowerCase();
+      const pageCards = pagesContainer.querySelectorAll('.page-card');
+      
+      pageCards.forEach(card => {
+        const searchText = card.getAttribute('data-searchable');
+        if (searchText.includes(filterValue)) {
+          card.style.display = 'block';
+        } else {
+          card.style.display = 'none';
+        }
+      });
+    });
+  }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  scrapper:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        GIT_SHA: ${GIT_SHA:-dev}
+        GIT_TAG: ${GIT_TAG:-v0.0.0-dev}
+    image: scrapper:latest
+    container_name: scrapper
+    ports:
+      - "3000:3000"
+    volumes:
+      - /mnt/c/Users/Regis/Downloads/scrapper:/home/pwuser/user_data
+      - ./user_scripts:/home/pwuser/user_scripts
+    environment:
+      # General settings
+      - HOST=0.0.0.0
+      - PORT=3000
+      - LOG_LEVEL=info
+      - DEBUG=false
+      
+      # Browser settings
+      - BROWSER_TYPE=chromium
+      - BROWSER_CONTEXT_LIMIT=20
+      - SCREENSHOT_TYPE=jpeg
+      - SCREENSHOT_QUALITY=80
+      
+      # Crawler settings
+      - CRAWL_MAX_CONCURRENCY=4
+      - CRAWL_DEFAULT_RATE_PER_DOMAIN=1.0
+      - CRAWL_HARD_PAGE_LIMIT=1000
+      - CRAWL_HARD_DURATION_SEC=3600
+      - CRAWL_ENABLE_ASSET_CAPTURE=true
+      
+      # Security
+      - BASIC_HTPASSWD=/.htpasswd
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:3000/ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    mem_limit: 2g
+    cpus: 1.0

@@ -1,0 +1,166 @@
+{% extends "library/base.html" %}
+
+{% block title %}{{ title }} - Page Content{% endblock %}
+
+{% block content %}
+<div class="library-nav">
+  <ul>
+    <li><a href="/library">All Domains</a></li>
+    <li><a href="/library/domain/{{ domain_name }}">{{ domain_name }}</a></li>
+    <li><a href="/library/crawl/{{ domain_name }}/{{ folder_name }}">{{ folder_name }}</a></li>
+    <li><a href="#" class="current">Page</a></li>
+  </ul>
+</div>
+
+<div class="breadcrumb">
+  <a href="/library">Library</a> / 
+  <a href="/library/domain/{{ domain_name }}">{{ domain_name }}</a> / 
+  <a href="/library/crawl/{{ domain_name }}/{{ folder_name }}">{{ folder_name }}</a> / 
+  <strong>Page</strong>
+</div>
+
+<header>
+  <h1>{{ title }}</h1>
+  <p>
+    <a href="{{ url }}" target="_blank">{{ url }}</a>
+    <span style="margin-left: 1rem;">
+      {% if page_data.ok %}
+        <span class="status-badge status-done">✓ Success</span>
+      {% else %}
+        <span class="status-badge status-error">✗ Failed</span>
+      {% endif %}
+    </span>
+  </p>
+</header>
+
+<div class="grid">
+  <div>
+    <h3>Page Information</h3>
+    <table>
+      <tbody>
+        <tr>
+          <td><strong>Crawl Depth:</strong></td>
+          <td>{{ page_data.depth }}</td>
+        </tr>
+        <tr>
+          <td><strong>Status Code:</strong></td>
+          <td>{{ page_data.status_code if page_data.status_code else 'N/A' }}</td>
+        </tr>
+        <tr>
+          <td><strong>Crawled At:</strong></td>
+          <td>{{ page_data.timestamp[:19] if page_data.timestamp else 'N/A' }}</td>
+        </tr>
+        <tr>
+          <td><strong>Content Length:</strong></td>
+          <td>{{ article.length if article.length else 'N/A' }} characters</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  
+  {% if meta %}
+  <div>
+    <h3>Metadata</h3>
+    <table>
+      <tbody>
+        {% for key, value in meta.items() %}
+          {% if value and key != 'title' %}
+          <tr>
+            <td><strong>{{ key|title }}:</strong></td>
+            <td>{{ (value|string)[:100] }}{% if (value|string)|length > 100 %}...{% endif %}</td>
+          </tr>
+          {% endif %}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+
+{% if screenshot_uri %}
+<div style="margin: 2rem 0;">
+  <h3>Screenshot</h3>
+  <img src="data:image/png;base64,{{ screenshot_uri }}" alt="Page Screenshot" style="max-width: 100%; border: 1px solid var(--muted-border-color); border-radius: 0.5rem;">
+</div>
+{% endif %}
+
+<div style="margin: 2rem 0;">
+  <h3>Content</h3>
+  
+  <div>
+    <button onclick="showTab('extracted')" id="tab-extracted" class="tab-button">Extracted Content</button>
+    <button onclick="showTab('text')" id="tab-text" class="tab-button">Text Only</button>
+    {% if full_content %}
+    <button onclick="showTab('html')" id="tab-html" class="tab-button">Full HTML</button>
+    {% endif %}
+  </div>
+  
+  <div id="content-extracted" class="content-preview">
+    {% if content %}
+      {{ content|safe }}
+    {% else %}
+      <p style="color: var(--muted-color);">No extracted content available.</p>
+    {% endif %}
+  </div>
+  
+  <div id="content-text" class="content-preview" style="display: none;">
+    {% if text_content %}
+      <pre style="white-space: pre-wrap; font-family: inherit;">{{ text_content }}</pre>
+    {% else %}
+      <p style="color: var(--muted-color);">No text content available.</p>
+    {% endif %}
+  </div>
+  
+  {% if full_content %}
+  <div id="content-html" class="content-preview" style="display: none;">
+    <pre><code>{{ full_content }}</code></pre>
+  </div>
+  {% endif %}
+</div>
+
+{% if page_data.reason and not page_data.ok %}
+<div style="background: var(--del-color); color: white; padding: 1rem; border-radius: 0.5rem; margin: 1rem 0;">
+  <strong>Error Reason:</strong> {{ page_data.reason }}
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<style>
+.tab-button {
+  background: var(--muted-color);
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  margin-right: 0.5rem;
+  border-radius: 0.25rem;
+  cursor: pointer;
+  margin-bottom: 1rem;
+}
+.tab-button.active {
+  background: var(--primary);
+}
+</style>
+
+<script>
+function showTab(tabName) {
+  // Hide all content divs
+  document.getElementById('content-extracted').style.display = 'none';
+  document.getElementById('content-text').style.display = 'none';
+  const htmlTab = document.getElementById('content-html');
+  if (htmlTab) htmlTab.style.display = 'none';
+  
+  // Remove active class from all buttons
+  document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+  
+  // Show selected content and activate button
+  document.getElementById('content-' + tabName).style.display = 'block';
+  document.getElementById('tab-' + tabName).classList.add('active');
+}
+
+// Initialize with extracted content tab
+document.addEventListener('DOMContentLoaded', function() {
+  showTab('extracted');
+});
+</script>
+{% endblock %}
