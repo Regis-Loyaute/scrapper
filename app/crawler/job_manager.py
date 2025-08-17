@@ -201,14 +201,18 @@ class JobManager:
     async def list_jobs(self, limit: int = 50, offset: int = 0) -> List[CrawlJob]:
         """List all jobs with pagination"""
         try:
-            # Use the sync storage method that returns job summaries, then convert to CrawlJob objects
+            # Get jobs from storage
             job_summaries = self._storage.list_jobs(limit=limit * 2, offset=0)  # Get more to account for filtering
             
             jobs = []
+            storage_job_ids = set()
+            
+            # Add jobs from storage
             for summary in job_summaries:
                 job_id = summary.job_id
+                storage_job_ids.add(job_id)
                 
-                # Check if job is in memory first
+                # Check if job is in memory first (for latest data)
                 if job_id in self._jobs:
                     jobs.append(self._jobs[job_id])
                 else:
@@ -217,6 +221,11 @@ class JobManager:
                     if job:
                         self._jobs[job_id] = job
                         jobs.append(job)
+            
+            # Add memory-only jobs (not yet persisted to storage)
+            for job_id, job in self._jobs.items():
+                if job_id not in storage_job_ids:
+                    jobs.append(job)
             
             # Sort by creation time (newest first)
             jobs.sort(key=lambda j: j.created_at, reverse=True)

@@ -56,57 +56,70 @@ class CrawlStorage:
         Returns:
             Generated job ID
         """
-        # Generate job ID based on URL and timestamp
-        timestamp = datetime.utcnow().isoformat()
-        job_id_input = f"{params.url}_{timestamp}"
-        job_id = hashlib.sha256(job_id_input.encode()).hexdigest()[:16]
-        
-        # Extract domain from URL
-        parsed_url = urlparse(str(params.url))
-        domain = parsed_url.netloc.lower()
-        # Remove 'www.' prefix for cleaner folder names
-        if domain.startswith('www.'):
-            domain = domain[4:]
-        
-        # Create timestamp-based folder name for this crawl
-        timestamp_str = datetime.utcnow().strftime("%Y-%m-%d_%H-%M-%S")
-        folder_name = f"{timestamp_str}_{job_id[:8]}"
-        
-        # Create domain-based directory structure
-        domain_dir = self.base_dir / domain
-        domain_dir.mkdir(exist_ok=True, parents=True)
-        
-        job_dir = domain_dir / folder_name
-        job_dir.mkdir(exist_ok=True)
-        (job_dir / 'pages').mkdir(exist_ok=True)
-        (job_dir / 'blobs').mkdir(exist_ok=True)
-        (job_dir / 'exports').mkdir(exist_ok=True)
-        
-        # Initialize manifest
-        manifest = {
-            'job_id': job_id,
-            'created_at': timestamp,
-            'params': params.model_dump(mode='json'),  # Ensure URL is serialized as string
-            'status': {
-                'state': 'queued',
-                'started_at': None,
-                'finished_at': None,
-                'elapsed_sec': 0,
-                'stats': {'queued': 0, 'visited': 0, 'ok': 0, 'failed': 0, 'skipped': 0, 'enqueued': 0},
-                'last_error': None
+        try:
+            # Generate job ID based on URL and timestamp
+            timestamp = datetime.utcnow().isoformat()
+            job_id_input = f"{params.url}_{timestamp}"
+            job_id = hashlib.sha256(job_id_input.encode()).hexdigest()[:16]
+            
+            logger.info(f"Creating new job {job_id} for URL: {params.url}")
+            
+            # Extract domain from URL
+            parsed_url = urlparse(str(params.url))
+            domain = parsed_url.netloc.lower()
+            # Remove 'www.' prefix for cleaner folder names
+            if domain.startswith('www.'):
+                domain = domain[4:]
+            
+            logger.debug(f"Job {job_id}: extracted domain '{domain}'")
+            
+            # Create timestamp-based folder name for this crawl
+            timestamp_str = datetime.utcnow().strftime("%Y-%m-%d_%H-%M-%S")
+            folder_name = f"{timestamp_str}_{job_id[:8]}"
+            
+            # Create domain-based directory structure
+            domain_dir = self.base_dir / domain
+            domain_dir.mkdir(exist_ok=True, parents=True)
+            
+            job_dir = domain_dir / folder_name
+            job_dir.mkdir(exist_ok=True)
+            (job_dir / 'pages').mkdir(exist_ok=True)
+            (job_dir / 'blobs').mkdir(exist_ok=True)
+            (job_dir / 'exports').mkdir(exist_ok=True)
+            
+            logger.debug(f"Job {job_id}: created directories at {job_dir}")
+            
+            # Initialize manifest
+            manifest = {
+                'job_id': job_id,
+                'created_at': timestamp,
+                'params': params.model_dump(mode='json'),  # Ensure URL is serialized as string
+                'status': {
+                    'state': 'queued',
+                    'started_at': None,
+                    'finished_at': None,
+                    'elapsed_sec': 0,
+                    'stats': {'queued': 0, 'visited': 0, 'ok': 0, 'failed': 0, 'skipped': 0, 'enqueued': 0},
+                    'last_error': None
+                }
             }
-        }
-        
-        # Save manifest to the domain-based directory
-        manifest_file = job_dir / 'manifest.json'
-        with open(manifest_file, 'w') as f:
-            json.dump(manifest, f, indent=2)
-        
-        # Register the job with its domain-based directory
-        self._register_job(job_id, domain, timestamp_str)
-        
-        logger.info(f"Created new crawl job: {job_id}")
-        return job_id
+            
+            # Save manifest to the domain-based directory
+            manifest_file = job_dir / 'manifest.json'
+            with open(manifest_file, 'w') as f:
+                json.dump(manifest, f, indent=2)
+            
+            logger.debug(f"Job {job_id}: saved manifest")
+            
+            # Register the job with its domain-based directory
+            self._register_job(job_id, domain, timestamp_str)
+            
+            logger.info(f"Created new crawl job: {job_id} in domain '{domain}'")
+            return job_id
+            
+        except Exception as e:
+            logger.error(f"Error creating new job for {params.url}: {e}")
+            raise
     
     def _get_job_dir(self, job_id: str) -> Path:
         """
@@ -195,6 +208,21 @@ class CrawlStorage:
         """
         try:
             job_id = job.job_id
+            
+            # Register new jobs with domain-based directory structure
+            if job_id not in self._job_registry and hasattr(job, 'params') and 'start_url' in job.params:
+                from datetime import datetime
+                parsed_url = urlparse(job.params['start_url'])
+                domain = parsed_url.netloc.lower()
+                if domain.startswith('www.'):
+                    domain = domain[4:]
+                
+                # Create timestamp for new job
+                created_time = datetime.fromisoformat(job.created_at.replace('Z', '+00:00')) if 'T' in job.created_at else datetime.utcnow()
+                timestamp_str = created_time.strftime('%Y-%m-%d_%H-%M-%S')
+                
+                # Register the job
+                self._register_job(job_id, domain, timestamp_str)
             
             # Create directory if it doesn't exist
             job_dir = self._get_job_dir(job_id)

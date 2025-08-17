@@ -491,7 +491,7 @@ class SiteCrawler:
     async def _update_status_with_stats(self):
         """Update status with current stats."""
         try:
-            job = self.storage.get_job(self.job_id)
+            job = await self.storage.load_job(self.job_id)
             if job:
                 # Update stats in the job
                 stats = self.frontier.get_stats()
@@ -508,7 +508,7 @@ class SiteCrawler:
     async def _update_status_if_not_terminal(self):
         """Update status to done if not already in terminal state."""
         try:
-            job = self.storage.get_job(self.job_id)
+            job = await self.storage.load_job(self.job_id)
             if job and job.status not in ['error', 'canceled']:
                 await self._update_status("done")
                 
