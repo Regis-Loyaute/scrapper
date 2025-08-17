@@ -1,0 +1,710 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="author" content="https://github.com/amerkurev">
+  <meta
+      name="description"
+      content="A Web scraper with a simple REST API living in Docker and using a Headless browser and Readability.js for parsing."
+    />
+  <link rel="stylesheet" href="/static/pico/1.5.7/pico.min.css">
+  <link rel="stylesheet" href="/static/custom.css">
+  <title>Job Details - Scrapper</title>
+  <style>
+    .job-header {
+      background: var(--card-background-color);
+      border: 1px solid var(--muted-border-color);
+      border-radius: 0.5rem;
+      padding: 2rem;
+      margin-bottom: 2rem;
+    }
+    .job-title {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 1rem;
+    }
+    .status-badge {
+      padding: 0.5rem 1rem;
+      border-radius: 1rem;
+      font-size: 0.9rem;
+      font-weight: bold;
+      text-transform: uppercase;
+    }
+    .status-running { background: var(--primary); color: white; }
+    .status-completed, .status-done { background: var(--ins-color); color: white; }
+    .status-failed, .status-error { background: var(--del-color); color: white; }
+    .status-stopped, .status-canceled { background: var(--muted-color); color: white; }
+    .status-pending { background: var(--secondary); color: white; }
+    
+    .job-stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 1.5rem;
+      margin: 2rem 0;
+    }
+    .stat-card {
+      background: var(--card-background-color);
+      border: 1px solid var(--muted-border-color);
+      border-radius: 0.5rem;
+      padding: 1.5rem;
+      text-align: center;
+    }
+    .stat-value {
+      font-size: 2rem;
+      font-weight: bold;
+      display: block;
+      margin-bottom: 0.5rem;
+    }
+    .stat-label {
+      font-size: 0.9rem;
+      color: var(--muted-color);
+    }
+    
+    .progress-section {
+      background: var(--card-background-color);
+      border: 1px solid var(--muted-border-color);
+      border-radius: 0.5rem;
+      padding: 2rem;
+      margin-bottom: 2rem;
+    }
+    .progress-bar {
+      background: var(--muted-color);
+      border-radius: 8px;
+      height: 12px;
+      margin: 1rem 0;
+      overflow: hidden;
+    }
+    .progress-fill {
+      background: var(--primary);
+      height: 12px;
+      border-radius: 8px;
+      transition: width 0.3s;
+    }
+    
+    .section-card {
+      background: var(--card-background-color);
+      border: 1px solid var(--muted-border-color);
+      border-radius: 0.5rem;
+      padding: 2rem;
+      margin-bottom: 2rem;
+    }
+    .section-title {
+      margin-top: 0;
+      margin-bottom: 1.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .config-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+    }
+    .config-item {
+      background: var(--code-background-color);
+      padding: 1rem;
+      border-radius: 0.25rem;
+      border: 1px solid var(--muted-border-color);
+    }
+    .config-label {
+      font-weight: bold;
+      color: var(--primary);
+      font-size: 0.9rem;
+      margin-bottom: 0.25rem;
+    }
+    .config-value {
+      font-family: monospace;
+      font-size: 0.9rem;
+      word-break: break-all;
+    }
+    
+    .logs-container {
+      background: var(--code-background-color);
+      border: 1px solid var(--muted-border-color);
+      border-radius: 0.5rem;
+      padding: 1.5rem;
+      max-height: 400px;
+      overflow-y: auto;
+      font-family: monospace;
+      font-size: 0.85rem;
+      line-height: 1.4;
+    }
+    .log-entry {
+      margin-bottom: 0.25rem;
+      padding: 0.25rem 0;
+    }
+    .log-timestamp {
+      color: var(--muted-color);
+    }
+    .log-error {
+      color: var(--del-color);
+    }
+    .log-success {
+      color: var(--ins-color);
+    }
+    
+    .pages-grid {
+      display: grid;
+      gap: 1rem;
+    }
+    .page-card {
+      background: var(--code-background-color);
+      border: 1px solid var(--muted-border-color);
+      border-radius: 0.25rem;
+      padding: 1rem;
+    }
+    .page-url {
+      font-family: monospace;
+      font-size: 0.85rem;
+      word-break: break-all;
+      margin-bottom: 0.5rem;
+    }
+    .page-meta {
+      display: flex;
+      gap: 1rem;
+      font-size: 0.8rem;
+      color: var(--muted-color);
+    }
+    .page-success {
+      border-left: 4px solid var(--ins-color);
+    }
+    .page-error {
+      border-left: 4px solid var(--del-color);
+    }
+    
+    .action-buttons {
+      display: flex;
+      gap: 1rem;
+      margin: 2rem 0;
+    }
+    .action-buttons button {
+      padding: 0.75rem 1.5rem;
+      margin: 0;
+    }
+    
+    .breadcrumb {
+      margin: 1rem 0;
+      font-size: 0.9rem;
+    }
+    .breadcrumb a {
+      color: var(--primary);
+      text-decoration: none;
+    }
+    
+    .auto-refresh {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    
+    .empty-state {
+      text-align: center;
+      padding: 3rem;
+      color: var(--muted-color);
+    }
+  </style>
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
+  <link rel="manifest" href="/static/icons/site.webmanifest">
+</head>
+<body>
+  <nav class="container-fluid">
+    <ul>
+      <li></li>
+      <li>
+        <strong><a href="/" class="logo">Scrapper</a></strong>
+        <span>🧹</span>
+      </li>
+    </ul>
+    <ul>
+      <li><a href="/" class="contrast">🏠 Home</a></li>
+      <li><a href="/library" class="contrast">📚 Library</a></li>
+      <li><a href="/jobs" class="contrast">🕷️ Jobs</a></li>
+      <li>
+        <a href="https://github.com/amerkurev/scrapper" class="contrast" aria-label="Scrapper GitHub repository">
+          <svg aria-hidden="true" focusable="false" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512" height="16px"><path fill="currentColor" d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"></path></svg>
+        </a>
+      </li>
+    </ul>
+  </nav>
+  
+  <main class="container">
+    <div class="breadcrumb">
+      <a href="/jobs">🕷️ All Jobs</a> / <strong id="job-id-breadcrumb">Job Details</strong>
+    </div>
+
+    <div id="loading" style="text-align: center; margin: 3rem 0;">
+      <p>Loading job details...</p>
+    </div>
+
+    <div id="job-content" style="display: none;">
+      <!-- Job Header -->
+      <div class="job-header">
+        <div class="job-title">
+          <div>
+            <h1 id="job-domain" style="margin: 0 0 0.5rem 0;">Job Details</h1>
+            <p id="job-url" style="margin: 0; font-family: monospace; word-break: break-all;"></p>
+            <p style="margin: 0.5rem 0 0 0; color: var(--muted-color);">
+              Job ID: <span id="job-id" style="font-family: monospace;"></span>
+            </p>
+          </div>
+          <span id="job-status-badge" class="status-badge">Loading</span>
+        </div>
+        
+        <div class="action-buttons">
+          <button id="refresh-btn" class="secondary">🔄 Refresh</button>
+          <button id="stop-btn" class="contrast" style="display: none;">⏹️ Stop Job</button>
+          <button id="view-library-btn" class="primary" style="display: none;">📚 View in Library</button>
+          <button id="delete-btn" class="contrast" style="display: none;">🗑️ Delete Job</button>
+        </div>
+        
+        <div class="auto-refresh">
+          <input type="checkbox" id="auto-refresh" checked>
+          <label for="auto-refresh">Auto-refresh (3s)</label>
+        </div>
+      </div>
+
+      <!-- Progress Section -->
+      <div id="progress-section" class="progress-section">
+        <h3 style="margin-top: 0;">📊 Progress Overview</h3>
+        <div class="job-stats">
+          <div class="stat-card">
+            <span id="pages-found" class="stat-value">0</span>
+            <span class="stat-label">Pages Found</span>
+          </div>
+          <div class="stat-card">
+            <span id="pages-crawled" class="stat-value">0</span>
+            <span class="stat-label">Pages Crawled</span>
+          </div>
+          <div class="stat-card">
+            <span id="progress-percent" class="stat-value">0%</span>
+            <span class="stat-label">Progress</span>
+          </div>
+          <div class="stat-card">
+            <span id="duration" class="stat-value">0s</span>
+            <span class="stat-label">Duration</span>
+          </div>
+        </div>
+        <div class="progress-bar">
+          <div id="progress-fill" class="progress-fill" style="width: 0%;"></div>
+        </div>
+      </div>
+
+      <!-- Configuration Section -->
+      <div class="section-card">
+        <h3 class="section-title">⚙️ Configuration</h3>
+        <div id="config-grid" class="config-grid">
+          <!-- Configuration items will be populated here -->
+        </div>
+      </div>
+
+      <!-- Live Logs Section -->
+      <div class="section-card">
+        <div class="section-title">
+          <h3 style="margin: 0;">📝 Live Logs</h3>
+          <button id="clear-logs-btn" class="secondary" style="padding: 0.5rem 1rem; margin: 0;">Clear</button>
+        </div>
+        <div id="logs-container" class="logs-container">
+          <div class="empty-state">No logs available yet...</div>
+        </div>
+      </div>
+
+      <!-- Crawled Pages Section -->
+      <div class="section-card">
+        <div class="section-title">
+          <h3 style="margin: 0;">🔗 Crawled Pages</h3>
+          <div>
+            <select id="page-filter" style="margin: 0;">
+              <option value="">All Pages</option>
+              <option value="success">Successful Only</option>
+              <option value="error">Errors Only</option>
+            </select>
+          </div>
+        </div>
+        <div id="pages-container" class="pages-grid">
+          <div class="empty-state">No pages crawled yet...</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="error-state" class="empty-state" style="display: none;">
+      <h3>Job Not Found</h3>
+      <p>The requested job could not be found or has been deleted.</p>
+      <p><a href="/jobs">← Back to Jobs List</a></p>
+    </div>
+  </main>
+
+  <footer>
+    <div class="container">
+      <ul>
+        <li><a href="https://github.com/amerkurev/scrapper" class="contrast">Give us a <span>⭐</span> on GitHub</a></li>
+      </ul>
+      <ul>
+        <li><small>On <a href="https://hub.docker.com/r/amerkurev/scrapper" class="secondary">Docker Hub</a></small></li>
+        <li><small>Submit <a href="https://github.com/amerkurev/scrapper/issues/new" class="secondary">new issue</a></small></li>
+        <li><small><a href="https://github.com/amerkurev/scrapper/blob/master/LICENSE" class="secondary">MIT License</a></small></li>
+        {% if revision %}<li><small>{{ revision }}</small></li>{% endif %}
+      </ul>
+    </div>
+  </footer>
+
+  <script src="/static/dark-mode.js"></script>
+  <script>
+    let currentJobId = null;
+    let refreshInterval = null;
+
+    // Initialize page
+    document.addEventListener('DOMContentLoaded', function() {
+      // Get job ID from URL
+      const urlParams = new URLSearchParams(window.location.search);
+      currentJobId = urlParams.get('id');
+      
+      if (!currentJobId) {
+        showError('No job ID provided');
+        return;
+      }
+      
+      setupEventListeners();
+      loadJobDetails();
+      startAutoRefresh();
+    });
+
+    function setupEventListeners() {
+      // Auto-refresh toggle
+      document.getElementById('auto-refresh').addEventListener('change', function() {
+        if (this.checked) {
+          startAutoRefresh();
+        } else {
+          stopAutoRefresh();
+        }
+      });
+
+      // Manual refresh
+      document.getElementById('refresh-btn').addEventListener('click', loadJobDetails);
+
+      // Stop job
+      document.getElementById('stop-btn').addEventListener('click', stopJob);
+
+      // Delete job
+      document.getElementById('delete-btn').addEventListener('click', deleteJob);
+
+      // View in library
+      document.getElementById('view-library-btn').addEventListener('click', function() {
+        window.open('/library/', '_blank');
+      });
+
+      // Clear logs
+      document.getElementById('clear-logs-btn').addEventListener('click', function() {
+        document.getElementById('logs-container').innerHTML = '<div class="empty-state">Logs cleared</div>';
+      });
+
+      // Page filter
+      document.getElementById('page-filter').addEventListener('change', filterPages);
+    }
+
+    function startAutoRefresh() {
+      stopAutoRefresh();
+      refreshInterval = setInterval(loadJobDetails, 3000);
+    }
+
+    function stopAutoRefresh() {
+      if (refreshInterval) {
+        clearInterval(refreshInterval);
+        refreshInterval = null;
+      }
+    }
+
+    async function loadJobDetails() {
+      try {
+        const response = await fetch(`/api/crawl/${currentJobId}`);
+        if (!response.ok) {
+          throw new Error('Job not found');
+        }
+
+        const job = await response.json();
+        displayJobDetails(job);
+        await loadJobLogs();
+        await loadJobPages();
+        
+      } catch (error) {
+        console.error('Error loading job details:', error);
+        showError(error.message);
+      }
+    }
+
+    function displayJobDetails(job) {
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('job-content').style.display = 'block';
+
+      // Extract domain from URL
+      let domain = 'Unknown Domain';
+      try {
+        domain = new URL(job.params?.start_url || job.params?.url || '').hostname;
+      } catch (e) {
+        domain = job.params?.start_url || job.params?.url || 'Unknown Domain';
+      }
+
+      // Update header
+      document.getElementById('job-domain').textContent = domain;
+      document.getElementById('job-url').textContent = job.params?.start_url || job.params?.url || '';
+      document.getElementById('job-id').textContent = job.job_id;
+      document.getElementById('job-id-breadcrumb').textContent = `Job ${job.job_id.substring(0, 8)}...`;
+
+      // Update status badge
+      const statusBadge = document.getElementById('job-status-badge');
+      statusBadge.textContent = job.status || 'Unknown';
+      statusBadge.className = `status-badge status-${(job.status || '').toLowerCase()}`;
+
+      // Update progress
+      const progress = job.pages_found > 0 ? (job.pages_crawled / job.pages_found) * 100 : 0;
+      document.getElementById('pages-found').textContent = job.pages_found || 0;
+      document.getElementById('pages-crawled').textContent = job.pages_crawled || 0;
+      document.getElementById('progress-percent').textContent = Math.round(progress) + '%';
+      document.getElementById('progress-fill').style.width = Math.min(progress, 100) + '%';
+      
+      // Calculate duration
+      const duration = formatDuration(job.created_at, job.finished_at);
+      document.getElementById('duration').textContent = duration;
+
+      // Update action buttons
+      updateActionButtons(job.status);
+
+      // Update configuration
+      displayConfiguration(job.params || {});
+    }
+
+    function updateActionButtons(status) {
+      const stopBtn = document.getElementById('stop-btn');
+      const viewLibraryBtn = document.getElementById('view-library-btn');
+      const deleteBtn = document.getElementById('delete-btn');
+
+      if (status === 'running') {
+        stopBtn.style.display = 'inline-block';
+        deleteBtn.style.display = 'none';
+      } else {
+        stopBtn.style.display = 'none';
+        deleteBtn.style.display = 'inline-block';
+      }
+
+      if (status === 'completed' || status === 'done') {
+        viewLibraryBtn.style.display = 'inline-block';
+      } else {
+        viewLibraryBtn.style.display = 'none';
+      }
+    }
+
+    function displayConfiguration(params) {
+      const configGrid = document.getElementById('config-grid');
+      configGrid.innerHTML = '';
+
+      const configItems = [
+        { label: 'Target URL', value: params.start_url || params.url || 'N/A' },
+        { label: 'Max Pages', value: params.max_pages || 'N/A' },
+        { label: 'Max Duration', value: (params.max_duration || 'N/A') + 's' },
+        { label: 'Scope', value: params.scope || 'N/A' },
+        { label: 'Rate Limit', value: (params.rate_limit || 'N/A') + '/s' },
+        { label: 'Respect Robots', value: params.respect_robots ? 'Yes' : 'No' },
+        { label: 'Include Assets', value: params.include_assets ? 'Yes' : 'No' },
+        { label: 'Concurrency', value: params.concurrency || 'N/A' }
+      ];
+
+      configItems.forEach(item => {
+        const configItem = document.createElement('div');
+        configItem.className = 'config-item';
+        configItem.innerHTML = `
+          <div class="config-label">${item.label}</div>
+          <div class="config-value">${item.value}</div>
+        `;
+        configGrid.appendChild(configItem);
+      });
+    }
+
+    async function loadJobLogs() {
+      try {
+        const response = await fetch(`/api/crawl/${currentJobId}/logs`);
+        if (response.ok) {
+          const logs = await response.text();
+          displayLogs(logs);
+        }
+      } catch (error) {
+        console.error('Error loading logs:', error);
+      }
+    }
+
+    function displayLogs(logsText) {
+      const logsContainer = document.getElementById('logs-container');
+      
+      if (!logsText || logsText.trim() === '') {
+        logsContainer.innerHTML = '<div class="empty-state">No logs available</div>';
+        return;
+      }
+
+      const logLines = logsText.split('\n').filter(line => line.trim());
+      logsContainer.innerHTML = '';
+
+      logLines.forEach(line => {
+        const logEntry = document.createElement('div');
+        logEntry.className = 'log-entry';
+        
+        // Add color coding for different log types
+        if (line.includes('ERROR') || line.includes('Failed')) {
+          logEntry.classList.add('log-error');
+        } else if (line.includes('SUCCESS') || line.includes('Completed')) {
+          logEntry.classList.add('log-success');
+        }
+        
+        logEntry.textContent = line;
+        logsContainer.appendChild(logEntry);
+      });
+
+      // Auto-scroll to bottom
+      logsContainer.scrollTop = logsContainer.scrollHeight;
+    }
+
+    async function loadJobPages() {
+      try {
+        const response = await fetch(`/api/crawl/${currentJobId}/pages?limit=50`);
+        if (response.ok) {
+          const data = await response.json();
+          displayPages(data.pages || []);
+        }
+      } catch (error) {
+        console.error('Error loading pages:', error);
+      }
+    }
+
+    function displayPages(pages) {
+      const pagesContainer = document.getElementById('pages-container');
+      
+      if (pages.length === 0) {
+        pagesContainer.innerHTML = '<div class="empty-state">No pages crawled yet</div>';
+        return;
+      }
+
+      pagesContainer.innerHTML = '';
+      pages.forEach(page => {
+        const pageCard = document.createElement('div');
+        pageCard.className = `page-card ${page.ok ? 'page-success' : 'page-error'}`;
+        pageCard.innerHTML = `
+          <div class="page-url">${page.url}</div>
+          <div class="page-meta">
+            <span>Depth: ${page.depth}</span>
+            <span>Status: ${page.status_code || 'N/A'}</span>
+            <span>${page.ok ? '✅ Success' : '❌ Failed'}</span>
+            ${page.length ? `<span>Length: ${page.length}</span>` : ''}
+          </div>
+        `;
+        pagesContainer.appendChild(pageCard);
+      });
+    }
+
+    function filterPages() {
+      const filter = document.getElementById('page-filter').value;
+      const pageCards = document.querySelectorAll('.page-card');
+      
+      pageCards.forEach(card => {
+        const isSuccess = card.classList.contains('page-success');
+        const isError = card.classList.contains('page-error');
+        
+        let show = true;
+        if (filter === 'success' && !isSuccess) show = false;
+        if (filter === 'error' && !isError) show = false;
+        
+        card.style.display = show ? 'block' : 'none';
+      });
+    }
+
+    async function stopJob() {
+      try {
+        const response = await fetch(`/api/crawl/${currentJobId}/stop`, {
+          method: 'POST'
+        });
+        
+        if (response.ok) {
+          showNotification('Job stopped successfully', 'success');
+          loadJobDetails(); // Refresh the page
+        } else {
+          throw new Error('Failed to stop job');
+        }
+      } catch (error) {
+        showNotification('Error stopping job: ' + error.message, 'error');
+      }
+    }
+
+    async function deleteJob() {
+      if (!confirm('Are you sure you want to delete this job and all its data?')) {
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/crawl/${currentJobId}`, {
+          method: 'DELETE'
+        });
+        
+        if (response.ok) {
+          showNotification('Job deleted successfully', 'success');
+          setTimeout(() => {
+            window.location.href = '/jobs';
+          }, 1000);
+        } else {
+          throw new Error('Failed to delete job');
+        }
+      } catch (error) {
+        showNotification('Error deleting job: ' + error.message, 'error');
+      }
+    }
+
+    function formatDuration(startTime, endTime) {
+      try {
+        const start = new Date(startTime);
+        const end = endTime ? new Date(endTime) : new Date();
+        const diffMs = end - start;
+        
+        if (diffMs < 60000) {
+          return Math.round(diffMs / 1000) + 's';
+        } else if (diffMs < 3600000) {
+          return Math.round(diffMs / 60000) + 'm';
+        } else {
+          return Math.round(diffMs / 3600000) + 'h';
+        }
+      } catch (e) {
+        return 'Unknown';
+      }
+    }
+
+    function showError(message) {
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('job-content').style.display = 'none';
+      document.getElementById('error-state').style.display = 'block';
+    }
+
+    function showNotification(message, type) {
+      const notification = document.createElement('div');
+      notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 1rem;
+        border-radius: 0.5rem;
+        color: white;
+        font-weight: bold;
+        z-index: 1000;
+        max-width: 300px;
+        background: ${type === 'error' ? 'var(--del-color)' : 'var(--ins-color)'};
+      `;
+      notification.textContent = message;
+      
+      document.body.appendChild(notification);
+      
+      setTimeout(() => {
+        if (notification.parentNode) {
+          notification.parentNode.removeChild(notification);
+        }
+      }, 5000);
+    }
+  </script>
+</body>
+</html>

@@ -118,6 +118,9 @@ class CrawlStorage:
         Returns:
             Path to job directory
         """
+        # Reload job registry to ensure we have the latest data
+        self._load_job_registry()
+        
         # Check job registry first for domain-based directories
         if job_id in self._job_registry:
             job_info = self._job_registry[job_id]
@@ -132,11 +135,15 @@ class CrawlStorage:
         if legacy_dir.exists():
             return legacy_dir
         
-        # If not found, search in domain subdirectories
+        # If not found, search in domain subdirectories to find the job
         for domain_dir in self.base_dir.iterdir():
             if domain_dir.is_dir() and not domain_dir.name.startswith('.'):
                 for job_dir in domain_dir.iterdir():
                     if job_dir.is_dir() and job_id in job_dir.name:
+                        # Update registry with discovered path
+                        domain = domain_dir.name
+                        timestamp_str = job_dir.name.split('_')[0] + '_' + job_dir.name.split('_')[1] + '_' + job_dir.name.split('_')[2]
+                        self._register_job(job_id, domain, timestamp_str)
                         return job_dir
         
         # If still not found, return legacy path (might be for a new job)
@@ -319,34 +326,68 @@ class CrawlStorage:
         jobs = []
         
         try:
-            # Get all job directories
-            job_dirs = [d for d in self.base_dir.iterdir() if d.is_dir()]
-            job_dirs.sort(key=lambda x: x.stat().st_mtime, reverse=True)  # Most recent first
+            # Get all job directories from domain-based structure
+            all_job_dirs = []
+            
+            # Iterate through domain directories
+            for domain_dir in self.base_dir.iterdir():
+                if domain_dir.is_dir() and not domain_dir.name.startswith('.'):
+                    # Look for job directories within each domain
+                    for job_dir in domain_dir.iterdir():
+                        if job_dir.is_dir() and (job_dir / 'manifest.json').exists():
+                            all_job_dirs.append(job_dir)
+            
+            # Sort by modification time (most recent first)
+            all_job_dirs.sort(key=lambda x: x.stat().st_mtime, reverse=True)
             
             # Apply pagination
-            for job_dir in job_dirs[offset:offset + limit]:
-                job_id = job_dir.name
-                manifest = self._load_manifest(job_id)
+            for job_dir in all_job_dirs[offset:offset + limit]:
+                # Load manifest and extract job_id
+                manifest = self._load_manifest_from_path(job_dir)
                 
-                if manifest:
-                    params = manifest['params']
-                    status = manifest['status']
-                    pages_count = self._count_pages(job_id)
-                    
-                    jobs.append(JobSummary(
-                        job_id=job_id,
-                        url=params['url'],
-                        state=status['state'],
-                        created_at=manifest['created_at'],
-                        started_at=status.get('started_at'),
-                        finished_at=status.get('finished_at'),
-                        pages_count=pages_count,
-                        stats=status.get('stats', {})
-                    ))
+                if not manifest:
+                    continue
+                
+                job_id = manifest.get('job_id', job_dir.name)
+                params = manifest['params']
+                status = manifest['status']
+                pages_count = self._count_pages_from_path(job_dir)
+                
+                jobs.append(JobSummary(
+                    job_id=job_id,
+                    url=params.get('start_url', params.get('url', '')),
+                    state=status['state'],
+                    created_at=manifest['created_at'],
+                    started_at=status.get('started_at'),
+                    finished_at=status.get('finished_at'),
+                    pages_count=pages_count,
+                    stats=status.get('stats', {})
+                ))
         except Exception as e:
             logger.error(f"Error listing jobs: {e}")
         
         return jobs
+
+    def _load_manifest_from_path(self, job_dir: Path) -> Optional[dict]:
+        """Load manifest from a specific job directory path."""
+        try:
+            manifest_file = job_dir / 'manifest.json'
+            if manifest_file.exists():
+                with open(manifest_file, 'r') as f:
+                    return json.load(f)
+        except Exception as e:
+            logger.error(f"Error loading manifest from {job_dir}: {e}")
+        return None
+
+    def _count_pages_from_path(self, job_dir: Path) -> int:
+        """Count pages in a specific job directory path."""
+        try:
+            pages_dir = job_dir / 'pages'
+            if pages_dir.exists():
+                return len(list(pages_dir.glob('*.json')))
+        except Exception as e:
+            logger.error(f"Error counting pages in {job_dir}: {e}")
+        return 0
     
     def list_pages(self, job_id: str, offset: int = 0, limit: int = 50, 
                    status: Optional[str] = None) -> List[PageSummary]:

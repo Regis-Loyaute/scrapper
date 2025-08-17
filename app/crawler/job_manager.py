@@ -113,6 +113,11 @@ class JobManager:
                 job.pages_crawled = stats.get('pages_crawled', 0)
                 job.pages_found = stats.get('pages_found', 0)
                 job.pages_remaining = stats.get('pages_remaining', 0)
+                
+                # Log progress updates periodically
+                if job.pages_crawled % 5 == 0 or job.pages_crawled <= 5:
+                    logger.info(f"Job {job_id}: Found {job.pages_found}, Crawled {job.pages_crawled}, Remaining {job.pages_remaining}")
+                
                 await self._storage.save_job(job)
             
             # Run the crawler
@@ -168,38 +173,53 @@ class JobManager:
     
     async def get_job(self, job_id: str) -> Optional[CrawlJob]:
         """Get job details"""
-        if job_id in self._jobs:
-            return self._jobs[job_id]
-        
-        # Try to load from storage
+        # Always refresh from storage to get latest progress
         try:
             job = await self._storage.load_job(job_id)
             if job:
-                self._jobs[job_id] = job
-            return job
+                # Update in-memory cache with fresh data
+                if job_id in self._jobs:
+                    # Preserve the original object but update its fields
+                    original_job = self._jobs[job_id]
+                    original_job.pages_crawled = job.pages_crawled
+                    original_job.pages_found = job.pages_found
+                    original_job.pages_remaining = job.pages_remaining
+                    original_job.status = job.status
+                    original_job.finished_at = job.finished_at
+                    return original_job
+                else:
+                    self._jobs[job_id] = job
+                    return job
+            return None
         except Exception as e:
             logger.error(f"Failed to load job {job_id}: {e}")
+            # Fall back to cached version if storage fails
+            if job_id in self._jobs:
+                return self._jobs[job_id]
             return None
     
     async def list_jobs(self, limit: int = 50, offset: int = 0) -> List[CrawlJob]:
         """List all jobs with pagination"""
         try:
-            # Load jobs from storage if not in memory
-            all_job_ids = await self._storage.list_jobs()
+            # Use the sync storage method that returns job summaries, then convert to CrawlJob objects
+            job_summaries = self._storage.list_jobs(limit=limit * 2, offset=0)  # Get more to account for filtering
             
-            # Load jobs that aren't in memory
-            for job_id in all_job_ids:
-                if job_id not in self._jobs:
+            jobs = []
+            for summary in job_summaries:
+                job_id = summary.job_id
+                
+                # Check if job is in memory first
+                if job_id in self._jobs:
+                    jobs.append(self._jobs[job_id])
+                else:
+                    # Load job from storage
                     job = await self._storage.load_job(job_id)
                     if job:
                         self._jobs[job_id] = job
+                        jobs.append(job)
             
             # Sort by creation time (newest first)
-            jobs = sorted(
-                self._jobs.values(),
-                key=lambda j: j.created_at,
-                reverse=True
-            )
+            jobs.sort(key=lambda j: j.created_at, reverse=True)
             
             # Apply pagination
             start = offset

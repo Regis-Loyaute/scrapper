@@ -35,3 +35,23 @@ async def root(request: Request, _: AuthRequired):
         'for_example': '&#10;'.join(for_example),
     }
     return templates.TemplateResponse(request=request, name='index.html', context=context)
+
+
+@router.get('/jobs', response_class=HTMLResponse, include_in_schema=False)
+async def jobs_page(request: Request, _: AuthRequired):
+    """Display the jobs management page."""
+    context = {
+        'request': request,
+        'revision': settings.REVISION,
+    }
+    return templates.TemplateResponse(request=request, name='jobs.html', context=context)
+
+
+@router.get('/job', response_class=HTMLResponse, include_in_schema=False)
+async def job_details_page(request: Request, _: AuthRequired):
+    """Display the job details page."""
+    context = {
+        'request': request,
+        'revision': settings.REVISION,
+    }
+    return templates.TemplateResponse(request=request, name='job_details.html', context=context)

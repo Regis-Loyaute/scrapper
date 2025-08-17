@@ -8,15 +8,30 @@
 [![License](https://img.shields.io/badge/license-mit-blue.svg)](https://github.com/amerkurev/scrapper/blob/master/LICENSE)
 </div>
 
-Scrapper is a web scraper tool designed to download web pages and extract articles in a structured format. The application combines functionality from several open-source projects to provide an effective solution for web content extraction.
+Scrapper is a comprehensive web scraping platform that offers both single-page article extraction and full website crawling capabilities. The application provides a powerful REST API and intuitive web interface for downloading, processing, and managing web content at scale.
 
 ## Quick start
 
+### Single-Page Scraping
 Start a Scrapper instance with:
 ```console
 docker run -d -p 3000:3000 --name scrapper amerkurev/scrapper:latest
 ```
+
+### Website Crawling (Recommended)
+For crawling entire websites, use Docker Compose with volume mapping:
+```console
+# Create docker-compose.yml (see Configuration section)
+docker-compose up -d
+```
+
 Scrapper will be available at http://localhost:3000/. For more details, see [Usage](#usage)
+
+### Web Interface Overview
+- **Home Page** (`/`) - Single-page scraping and crawl job creation
+- **Jobs Dashboard** (`/jobs`) - Monitor and manage all crawl jobs  
+- **Content Library** (`/library`) - Browse and search crawled content
+- **Job Details** (`/job?id={job_id}`) - Detailed job monitoring and logs
 
 
 ## Demo
@@ -26,23 +41,45 @@ https://user-images.githubusercontent.com/28217522/225941167-633576fa-c9e2-4c63-
 
 
 ## Features
-Scrapper provides the following features:
 
+### Core Web Scraping
 - **Built-in headless browser** - Integrates with [Playwright](https://github.com/microsoft/playwright) to handle JavaScript-heavy websites, cookie consent forms, and other interactive elements.
 - **Read mode parsing** - Uses Mozilla's [Readability.js](https://github.com/mozilla/readability) library to extract article content similar to browser "Reader View" functionality.
-- **Web interface** - Provides a user-friendly interface for debugging queries and experimenting with parameters. Built with the [Pico](https://github.com/picocss/pico) CSS framework with dark theme support.
-- **Simple REST API** - Features a straightforward API requiring minimal parameters for integration.
 - **News link extraction** - Identifies and extracts links to news articles from website main pages.
 
-Additional capabilities include:
+### Website Crawling Engine
+- **Recursive site crawling** - Systematically discovers and processes multiple pages across entire websites
+- **Domain-based organization** - Automatically organizes crawled content by domain with timestamped job folders
+- **Intelligent scope control** - Configurable crawling scope (domain, host, path, or custom regex patterns)
+- **Rate limiting** - Respectful crawling with configurable per-domain rate limits
+- **Robots.txt compliance** - Optional robots.txt respect for ethical crawling
+- **Real-time progress tracking** - Live monitoring of crawl progress with detailed statistics
+- **Job management system** - Complete lifecycle management for crawl jobs (start, stop, monitor, delete)
 
-- **Result caching** - Caches parsing results to disk for faster retrieval.
-- **Page screenshots** - Captures visual representation of pages as seen by the parser.
-- **Session management** - Configurable incognito mode or persistent sessions.
-- **Proxy support** - Compatible with HTTP, SOCKS4, and SOCKS5 proxies.
-- **Customization options** - Control for HTTP headers, viewport settings, Readability parser parameters, and more.
-- **Docker delivery** - Packaged as a Docker image for simple deployment.
-- **Open-source license** - Available under MIT license.
+### Web Interface & User Experience
+- **Dual-mode interface** - Choose between single-page scraping or full website crawling
+- **Real-time dashboard** - Live progress monitoring with auto-refreshing job status
+- **Content library** - Browse and search crawled content through an intuitive web interface
+- **Job details view** - Comprehensive job monitoring with configuration, logs, and page listings
+- **Jobs management** - Central hub for managing all crawl jobs with filtering and sorting
+- **Dark theme support** - Built with the [Pico](https://github.com/picocss/pico) CSS framework
+
+### API & Integration
+- **Comprehensive REST API** - Full API coverage for both single-page and crawling operations
+- **Simple integration** - Straightforward API requiring minimal parameters
+- **Structured data output** - JSON-formatted results with extracted content and metadata
+- **Export capabilities** - Export crawled data in JSONL and ZIP formats
+
+### Technical Capabilities
+- **Result caching** - Caches parsing results to disk for faster retrieval
+- **Page screenshots** - Captures visual representation of pages as seen by the parser
+- **Session management** - Configurable incognito mode or persistent sessions
+- **Proxy support** - Compatible with HTTP, SOCKS4, and SOCKS5 proxies
+- **Advanced customization** - Control for HTTP headers, viewport settings, Readability parser parameters, and more
+- **Concurrent processing** - Multi-threaded crawling with configurable concurrency limits
+- **Error handling & resilience** - Robust error handling with retry mechanisms and detailed logging
+- **Docker delivery** - Packaged as a Docker image for simple deployment
+- **Open-source license** - Available under MIT license
 
 
 ## Usage
@@ -112,32 +149,107 @@ docker logs -f scrapper
 
 Scrapper can be configured using environment variables. You can set these either directly when running the container or through an environment file passed with `--env-file=.env`.
 
+### General Settings
 | Environment Variable | Description | Default |
 | ------------------------- | ------------------------------------------------------------------ | --------------------- |
 | HOST | Interface address to bind the server to | 0.0.0.0 |
 | PORT | Web interface port number | 3000 |
 | LOG_LEVEL | Logging detail level (debug, info, warning, error, critical) | info |
 | BASIC_HTPASSWD | Path to the htpasswd file for basic authentication | /.htpasswd |
+| UVICORN_WORKERS | Number of web server worker processes | 2 |
+| DEBUG | Enable debug mode | false |
+
+### Browser Settings
+| Environment Variable | Description | Default |
+| ------------------------- | ------------------------------------------------------------------ | --------------------- |
 | BROWSER_TYPE | Browser type to use (chromium, firefox, webkit) | chromium |
 | BROWSER_CONTEXT_LIMIT | Maximum number of browser contexts (tabs) | 20 |
 | SCREENSHOT_TYPE | Screenshot type (jpeg or png) | jpeg |
 | SCREENSHOT_QUALITY | Screenshot quality (0-100) | 80 |
-| UVICORN_WORKERS | Number of web server worker processes | 2 |
-| DEBUG | Enable debug mode | false |
+
+### Crawler Settings
+| Environment Variable | Description | Default |
+| ------------------------- | ------------------------------------------------------------------ | --------------------- |
+| CRAWL_MAX_CONCURRENCY | Maximum number of concurrent crawling tasks | 4 |
+| CRAWL_DEFAULT_RATE_PER_DOMAIN | Default rate limit per domain (requests per second) | 1.0 |
+| CRAWL_HARD_PAGE_LIMIT | Hard limit on maximum pages per crawl job | 1000 |
+| CRAWL_HARD_DURATION_SEC | Hard limit on maximum crawl duration in seconds | 3600 |
+| CRAWL_ENABLE_ASSET_CAPTURE | Enable capturing of assets (images, CSS, JS) | true |
 
 ### Example .env file
 
 ```ini
-LOG_LEVEL=error
-BROWSER_TYPE=firefox
+LOG_LEVEL=info
+BROWSER_TYPE=chromium
 SCREENSHOT_TYPE=jpeg
 SCREENSHOT_QUALITY=90
 UVICORN_WORKERS=4
 DEBUG=false
+
+# Crawler settings
+CRAWL_MAX_CONCURRENCY=6
+CRAWL_DEFAULT_RATE_PER_DOMAIN=2.0
+CRAWL_HARD_PAGE_LIMIT=5000
+CRAWL_HARD_DURATION_SEC=7200
+CRAWL_ENABLE_ASSET_CAPTURE=false
 ```
 
-To use an environment file with Docker, include it when running the container:
+### Docker Compose Configuration (Recommended)
 
+Create a `docker-compose.yml` file for easier deployment with volume mapping:
+
+```yaml
+version: '3.8'
+
+services:
+  scrapper:
+    image: amerkurev/scrapper:latest
+    container_name: scrapper
+    ports:
+      - "3000:3000"
+    volumes:
+      # Save crawled data to local directory
+      - ./user_data:/home/pwuser/user_data
+      - ./user_scripts:/home/pwuser/user_scripts
+    environment:
+      # General settings
+      - HOST=0.0.0.0
+      - PORT=3000
+      - LOG_LEVEL=info
+      - DEBUG=false
+      
+      # Browser settings
+      - BROWSER_TYPE=chromium
+      - BROWSER_CONTEXT_LIMIT=20
+      - SCREENSHOT_TYPE=jpeg
+      - SCREENSHOT_QUALITY=80
+      
+      # Crawler settings
+      - CRAWL_MAX_CONCURRENCY=4
+      - CRAWL_DEFAULT_RATE_PER_DOMAIN=1.0
+      - CRAWL_HARD_PAGE_LIMIT=1000
+      - CRAWL_HARD_DURATION_SEC=3600
+      - CRAWL_ENABLE_ASSET_CAPTURE=true
+      
+      # Security
+      - BASIC_HTPASSWD=/.htpasswd
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:3000/ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    mem_limit: 2g
+    cpus: 1.0
+```
+
+Start with Docker Compose:
+```bash
+docker-compose up -d
+```
+
+Or use an environment file with Docker:
 ```bash
 docker run -d --name scrapper --env-file=.env -v $(pwd)/user_data:/home/pwuser/user_data -v $(pwd)/user_scripts:/home/pwuser/user_scripts -p 3000:3000 amerkurev/scrapper:latest
 ```
@@ -206,7 +318,192 @@ For production use, always use properly signed certificates from a trusted certi
 
 
 ## API Reference
-### GET /api/article?url=...
+
+Scrapper provides comprehensive REST APIs for both single-page extraction and website crawling operations.
+
+### Crawler API
+
+#### POST /api/crawl/
+Start a new website crawl job.
+
+**Request Body:**
+```json
+{
+  "start_url": "https://example.com",
+  "max_pages": 50,
+  "max_duration": 3600,
+  "scope": "domain",
+  "rate_limit": 1.0,
+  "respect_robots": true,
+  "include_assets": false,
+  "custom_patterns": []
+}
+```
+
+**Parameters:**
+| Parameter | Description | Default | Type |
+| :-------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :-------- | :--- |
+| `start_url` | Starting URL for the crawl | Required | string |
+| `max_pages` | Maximum pages to crawl (1-5000) | 50 | integer |
+| `max_duration` | Maximum crawl duration in seconds (60-43200) | 3600 | integer |
+| `scope` | Crawl scope: 'domain', 'host', 'path', or regex pattern | domain | string |
+| `rate_limit` | Requests per second per domain (0.1-10.0) | 1.0 | float |
+| `respect_robots` | Respect robots.txt | true | boolean |
+| `include_assets` | Include assets (images, CSS, JS) | false | boolean |
+| `custom_patterns` | Custom URL patterns to include/exclude | [] | array |
+
+**Response:**
+```json
+{
+  "job_id": "abc123def456",
+  "status": "running",
+  "message": "Started crawling https://example.com/",
+  "estimated_pages": null
+}
+```
+
+#### GET /api/crawl/
+List all crawl jobs with pagination and filtering.
+
+**Parameters:**
+| Parameter | Description | Default | Type |
+| :-------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :-------- | :--- |
+| `limit` | Maximum jobs to return (1-100) | 20 | integer |
+| `offset` | Number of jobs to skip | 0 | integer |
+| `status` | Filter by job status | null | string |
+
+**Response:**
+```json
+{
+  "jobs": [
+    {
+      "job_id": "abc123def456",
+      "status": "running",
+      "created_at": "2024-01-01T12:00:00Z",
+      "started_at": "2024-01-01T12:00:01Z",
+      "finished_at": null,
+      "pages_crawled": 25,
+      "pages_found": 100,
+      "pages_remaining": 75,
+      "errors": [],
+      "progress_percent": 25.0
+    }
+  ],
+  "total": 1,
+  "offset": 0,
+  "limit": 20
+}
+```
+
+#### GET /api/crawl/{job_id}
+Get detailed status for a specific crawl job.
+
+**Response:**
+```json
+{
+  "job_id": "abc123def456",
+  "status": "running",
+  "created_at": "2024-01-01T12:00:00Z",
+  "started_at": "2024-01-01T12:00:01Z",
+  "finished_at": null,
+  "pages_crawled": 25,
+  "pages_found": 100,
+  "pages_remaining": 75,
+  "errors": [],
+  "progress_percent": 25.0
+}
+```
+
+#### POST /api/crawl/{job_id}/stop
+Stop a running crawl job.
+
+**Response:**
+```json
+{
+  "message": "Job abc123def456 stopped successfully"
+}
+```
+
+#### DELETE /api/crawl/{job_id}
+Delete a crawl job and all its associated data.
+
+**Response:**
+```json
+{
+  "message": "Job abc123def456 deleted successfully"
+}
+```
+
+#### GET /api/crawl/{job_id}/logs
+Get logs for a specific crawl job.
+
+**Response:**
+```
+[2024-01-01T12:00:01] Starting crawl from https://example.com/
+[2024-01-01T12:00:03] Successfully processed https://example.com/ (depth: 0, links: 25)
+[2024-01-01T12:00:05] Successfully processed https://example.com/page1 (depth: 1, links: 10)
+```
+
+#### GET /api/crawl/{job_id}/pages
+List pages crawled by a specific job.
+
+**Parameters:**
+| Parameter | Description | Default | Type |
+| :-------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :-------- | :--- |
+| `limit` | Maximum pages to return (1-100) | 20 | integer |
+| `offset` | Number of pages to skip | 0 | integer |
+
+**Response:**
+```json
+{
+  "job_id": "abc123def456",
+  "pages": [
+    {
+      "url": "https://example.com/",
+      "depth": 0,
+      "status_code": 200,
+      "ok": true,
+      "length": 1500,
+      "title": "Example Page",
+      "reason_if_skipped": null
+    }
+  ],
+  "total": 25,
+  "offset": 0,
+  "limit": 20
+}
+```
+
+#### GET /api/crawl/{job_id}/stats
+Get comprehensive statistics for a crawl job.
+
+**Response:**
+```json
+{
+  "job_id": "abc123def456",
+  "status": "completed",
+  "created_at": "2024-01-01T12:00:00Z",
+  "started_at": "2024-01-01T12:00:01Z",
+  "finished_at": "2024-01-01T12:15:30Z",
+  "duration_seconds": 929.0,
+  "pages_crawled": 50,
+  "pages_found": 50,
+  "pages_remaining": 0,
+  "total_pages_stored": 50,
+  "average_page_size": 2048,
+  "crawl_rate": 3.2,
+  "errors": [],
+  "params": {
+    "start_url": "https://example.com",
+    "max_pages": 50,
+    "scope": "domain"
+  }
+}
+```
+
+### Single-Page Extraction API
+
+#### GET /api/article?url=...
 The Scrapper API provides a straightforward interface accessible through a single endpoint:
 
 ```console

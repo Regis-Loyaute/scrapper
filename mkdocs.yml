@@ -90,3 +90,11 @@ plugins:
 
 extra_css:
   - stylesheets/extra.css
+
+nav:
+  - Home: README.md
+  - User Guides:
+      - Web Interface Guide: web-interface-guide.md
+      - Deployment Guide: deployment-guide.md
+  - API Reference:
+      - Crawler API: crawler-api.md

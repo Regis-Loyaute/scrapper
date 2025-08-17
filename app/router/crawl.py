@@ -155,11 +155,11 @@ async def list_jobs(
                 progress = (job.pages_crawled / job.pages_found) * 100
             
             job_statuses.append(JobStatus(
-                job_id=job.id,
-                status=job.status.value,
-                created_at=job.created_at.isoformat(),
-                started_at=job.started_at.isoformat() if job.started_at else None,
-                finished_at=job.finished_at.isoformat() if job.finished_at else None,
+                job_id=job.job_id,
+                status=job.status,
+                created_at=job.created_at,
+                started_at=job.started_at,
+                finished_at=job.finished_at,
                 pages_crawled=job.pages_crawled,
                 pages_found=job.pages_found,
                 pages_remaining=job.pages_remaining,
@@ -198,11 +198,11 @@ async def get_job_status(
             progress = (job.pages_crawled / job.pages_found) * 100
         
         return JobStatus(
-            job_id=job.id,
-            status=job.status.value,
-            created_at=job.created_at.isoformat(),
-            started_at=job.started_at.isoformat() if job.started_at else None,
-            finished_at=job.finished_at.isoformat() if job.finished_at else None,
+            job_id=job.job_id,
+            status=job.status,
+            created_at=job.created_at,
+            started_at=job.started_at,
+            finished_at=job.finished_at,
             pages_crawled=job.pages_crawled,
             pages_found=job.pages_found,
             pages_remaining=job.pages_remaining,
@@ -311,6 +311,46 @@ async def delete_job(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get('/{job_id}/logs', summary='Get job logs')
+async def get_job_logs(
+    job_id: str,
+    _: AuthRequired,
+) -> str:
+    """
+    Get the logs for a specific crawl job.
+    """
+    try:
+        job = await job_manager.get_job(job_id)
+        if not job:
+            raise HTTPException(status_code=404, detail="Job not found")
+        
+        # Get logs from storage
+        from crawler.storage import get_storage
+        storage = get_storage()
+        
+        try:
+            # Read logs from the job directory
+            job_dir = storage._get_job_dir(job_id)
+            logs_file = job_dir / 'logs.txt'
+            
+            if logs_file.exists():
+                with open(logs_file, 'r') as f:
+                    logs_content = f.read()
+                return logs_content
+            else:
+                return ""
+                
+        except Exception as e:
+            logger.error(f"Error reading logs for job {job_id}: {e}")
+            return ""
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get job logs: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get('/{job_id}/pages', summary='List pages crawled by job')
 async def list_job_pages(
     job_id: str,
@@ -327,9 +367,9 @@ async def list_job_pages(
             raise HTTPException(status_code=404, detail="Job not found")
         
         # Get pages from storage
-        from crawler.storage import CrawlStorage
-        storage = CrawlStorage()
-        pages = await storage.list_pages(job_id)
+        from crawler.storage import get_storage
+        storage = get_storage()
+        pages = storage.list_pages(job_id)
         
         # Apply pagination
         total = len(pages)
