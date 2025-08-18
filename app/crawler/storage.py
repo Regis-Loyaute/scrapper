@@ -132,7 +132,7 @@ class CrawlStorage:
             Path to job directory
         """
         # Reload job registry to ensure we have the latest data
-        self._load_job_registry()
+        self._job_registry = self._load_job_registry()
         
         # Check job registry first for domain-based directories
         if job_id in self._job_registry:
@@ -140,8 +140,16 @@ class CrawlStorage:
             domain_dir = self.base_dir / job_info['domain']
             folder_name = f"{job_info['timestamp']}_{job_id[:8]}"
             domain_based_dir = domain_dir / folder_name
-            if domain_based_dir.exists():
-                return domain_based_dir
+            
+            # Create the directory if it doesn't exist (for new jobs)
+            if not domain_based_dir.exists():
+                domain_based_dir.mkdir(parents=True, exist_ok=True)
+                (domain_based_dir / 'pages').mkdir(exist_ok=True)
+                (domain_based_dir / 'blobs').mkdir(exist_ok=True)
+                (domain_based_dir / 'exports').mkdir(exist_ok=True)
+                logger.debug(f"Created missing directories for job {job_id} at {domain_based_dir}")
+            
+            return domain_based_dir
         
         # Fallback: try to find existing job directory in legacy format
         legacy_dir = self.base_dir / job_id
@@ -316,13 +324,49 @@ class CrawlStorage:
     async def delete_job(self, job_id: str) -> None:
         """Delete a job and all its data"""
         try:
+            # Get job directory before removing from registry
             job_dir = self._get_job_dir(job_id)
+            
+            # Remove from job registry first to prevent recreation
+            if job_id in self._job_registry:
+                del self._job_registry[job_id]
+                self._save_job_registry()
+                logger.debug(f"Removed job {job_id} from registry")
+            
+            # Delete the directory and all its contents
             if job_dir.exists():
                 import shutil
                 shutil.rmtree(job_dir)
-                logger.info(f"Deleted job {job_id}")
+                logger.debug(f"Deleted job directory: {job_dir}")
+                
+                # Also remove parent domain directory if it's empty
+                parent_domain_dir = job_dir.parent
+                if parent_domain_dir != self.base_dir and parent_domain_dir.exists():
+                    try:
+                        # Only remove if empty (ignoring hidden files)
+                        if not any(f for f in parent_domain_dir.iterdir() if not f.name.startswith('.')):
+                            parent_domain_dir.rmdir()
+                            logger.debug(f"Removed empty domain directory: {parent_domain_dir}")
+                    except OSError:
+                        pass  # Directory not empty, that's fine
+            
+            logger.info(f"Successfully deleted job {job_id}")
         except Exception as e:
             logger.error(f"Error deleting job {job_id}: {e}")
+            raise
+
+    async def list_job_summaries(self, limit: int = 100, offset: int = 0) -> List[JobSummary]:
+        """
+        List all crawl jobs with summary information.
+        
+        Args:
+            limit: Maximum number of jobs to return
+            offset: Number of jobs to skip
+            
+        Returns:
+            List of job summaries
+        """
+        return self.list_jobs(limit=limit, offset=offset)
     
     async def list_pages(self, job_id: str) -> List[str]:
         """List all page files for a job"""
@@ -707,26 +751,6 @@ class CrawlStorage:
             logger.error(f"Error exporting job {job_id} to ZIP: {e}")
             raise
     
-    def delete_job(self, job_id: str) -> bool:
-        """
-        Delete a crawl job and all associated data.
-        
-        Args:
-            job_id: Job identifier
-            
-        Returns:
-            True if successfully deleted
-        """
-        try:
-            job_dir = self._get_job_dir(job_id)
-            if job_dir.exists():
-                shutil.rmtree(job_dir)
-                logger.info(f"Deleted crawl job: {job_id}")
-                return True
-            return False
-        except Exception as e:
-            logger.error(f"Error deleting job {job_id}: {e}")
-            return False
     
     def job_exists(self, job_id: str) -> bool:
         """Check if job exists."""

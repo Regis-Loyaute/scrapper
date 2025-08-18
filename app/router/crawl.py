@@ -145,7 +145,7 @@ async def list_jobs(
         
         # Filter by status if specified
         if status:
-            jobs = [job for job in jobs if job.status.value == status]
+            jobs = [job for job in jobs if job.status == status]
         
         # Convert to response format
         job_statuses = []
@@ -176,6 +176,20 @@ async def list_jobs(
         
     except Exception as e:
         logger.error(f"Failed to list jobs: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post('/fix-stuck', summary='Fix stuck jobs')
+async def fix_stuck_jobs(_: AuthRequired) -> dict:
+    """
+    Fix jobs that are stuck in running state but have completed or failed.
+    """
+    try:
+        fixed_count = await job_manager.fix_stuck_jobs()
+        return {"message": f"Fixed {fixed_count} stuck jobs"}
+        
+    except Exception as e:
+        logger.error(f"Failed to fix stuck jobs: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -235,12 +249,41 @@ async def get_job_stats(
         duration = None
         crawl_rate = None
         if stats['started_at'] and stats['finished_at']:
-            start = datetime.fromisoformat(stats['started_at'])
-            end = datetime.fromisoformat(stats['finished_at'])
-            duration = (end - start).total_seconds()
-            
-            if duration > 0 and stats['pages_crawled'] > 0:
-                crawl_rate = stats['pages_crawled'] / duration
+            try:
+                from datetime import timezone
+                
+                # Parse timestamps - assume naive timestamps are UTC
+                start_str = stats['started_at'].replace('Z', '+00:00') if 'Z' in stats['started_at'] else stats['started_at']
+                end_str = stats['finished_at'].replace('Z', '+00:00') if 'Z' in stats['finished_at'] else stats['finished_at']
+                
+                start = datetime.fromisoformat(start_str)
+                end = datetime.fromisoformat(end_str)
+                
+                # If timestamps are naive (no timezone), assume they are UTC
+                if start.tzinfo is None:
+                    start = start.replace(tzinfo=timezone.utc)
+                if end.tzinfo is None:
+                    end = end.replace(tzinfo=timezone.utc)
+                
+                # Convert both to UTC for consistent calculation
+                start_utc = start.astimezone(timezone.utc)
+                end_utc = end.astimezone(timezone.utc)
+                
+                duration = (end_utc - start_utc).total_seconds()
+                
+                # Ensure duration is positive and reasonable
+                if duration < 0:
+                    logger.warning(f"Negative duration for job {job_id}: {duration} seconds, setting to 0")
+                    duration = 0
+                elif duration > 86400:  # More than 24 hours
+                    logger.warning(f"Very long duration for job {job_id}: {duration} seconds ({duration/3600:.2f} hours)")
+                
+                if duration > 0 and stats['pages_crawled'] > 0:
+                    crawl_rate = stats['pages_crawled'] / duration
+                    
+            except (ValueError, TypeError) as e:
+                logger.warning(f"Error calculating duration for job {job_id}: {e}")
+                duration = None
         
         return JobStats(
             job_id=stats['job_id'],

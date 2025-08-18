@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Job Details - Scrapper</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .status-pending { color: #6c757d; }
+        .status-running { color: #007bff; }
+        .status-completed { color: #28a745; }
+        .status-failed { color: #dc3545; }
+        .status-stopped { color: #ffc107; }
+        
+        .job-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            border-radius: 10px;
+        }
+        
+        .stat-card {
+            border: none;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            transition: transform 0.2s;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-2px);
+        }
+        
+        .progress-ring {
+            position: relative;
+            width: 120px;
+            height: 120px;
+        }
+        
+        .progress-ring svg {
+            width: 120px;
+            height: 120px;
+            transform: rotate(-90deg);
+        }
+        
+        .progress-ring circle {
+            fill: none;
+            stroke-width: 8;
+        }
+        
+        .progress-ring .bg {
+            stroke: #f3f4f6;
+        }
+        
+        .progress-ring .progress {
+            stroke: #007bff;
+            stroke-linecap: round;
+            transition: stroke-dasharray 0.5s ease;
+        }
+        
+        .progress-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 1.2rem;
+            font-weight: bold;
+        }
+        
+        .log-container {
+            background: #1a1a1a;
+            color: #00ff00;
+            font-family: 'Courier New', monospace;
+            padding: 1rem;
+            border-radius: 5px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .page-item {
+            border-left: 3px solid #007bff;
+            padding: 0.5rem;
+            margin: 0.5rem 0;
+            background: #f8f9fa;
+            border-radius: 0 5px 5px 0;
+        }
+        
+        .page-item:hover {
+            background: #e9ecef;
+        }
+        
+        .config-item {
+            padding: 0.5rem;
+            border-bottom: 1px solid #dee2e6;
+        }
+        
+        .config-item:last-child {
+            border-bottom: none;
+        }
+        
+        .config-label {
+            font-weight: 600;
+            color: #495057;
+        }
+        
+        .config-value {
+            color: #6c757d;
+        }
+        
+        .tab-content {
+            padding: 1.5rem;
+            background: white;
+            border-radius: 0 0 10px 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .nav-tabs {
+            border-bottom: none;
+        }
+        
+        .nav-tabs .nav-link {
+            border: none;
+            border-radius: 10px 10px 0 0;
+            margin-right: 0.25rem;
+            color: #6c757d;
+        }
+        
+        .nav-tabs .nav-link.active {
+            background: white;
+            color: #007bff;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body class="bg-light">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-spider"></i> Scrapper
+            </a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="/">Home</a>
+                <a class="nav-link" href="/library">Library</a>
+                <a class="nav-link active" href="/jobs">Jobs</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <!-- Job Header -->
+        <div class="job-header">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h1 class="mb-2">
+                        <i class="fas fa-cog"></i> Job Details
+                    </h1>
+                    <h3 id="job-url" class="mb-2"></h3>
+                    <p class="mb-0" id="job-id"></p>
+                </div>
+                <div class="col-md-4 text-end">
+                    <div class="progress-ring" id="progress-ring">
+                        <svg>
+                            <circle class="bg" cx="60" cy="60" r="52"></circle>
+                            <circle class="progress" cx="60" cy="60" r="52" stroke-dasharray="0 327"></circle>
+                        </svg>
+                        <div class="progress-text" id="progress-text">0%</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Status Cards -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card stat-card">
+                    <div class="card-body text-center">
+                        <i class="fas fa-clock fa-2x text-primary mb-2"></i>
+                        <h5 class="card-title">Status</h5>
+                        <p class="card-text" id="job-status">Loading...</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card">
+                    <div class="card-body text-center">
+                        <i class="fas fa-file-alt fa-2x text-success mb-2"></i>
+                        <h5 class="card-title">Pages Crawled</h5>
+                        <p class="card-text" id="pages-crawled">0</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card">
+                    <div class="card-body text-center">
+                        <i class="fas fa-search fa-2x text-info mb-2"></i>
+                        <h5 class="card-title">Pages Found</h5>
+                        <p class="card-text" id="pages-found">0</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card">
+                    <div class="card-body text-center">
+                        <i class="fas fa-stopwatch fa-2x text-warning mb-2"></i>
+                        <h5 class="card-title">Duration</h5>
+                        <p class="card-text" id="job-duration">-</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="btn-group" role="group">
+                    <button type="button" id="stop-btn" class="btn btn-warning" onclick="stopJob()">
+                        <i class="fas fa-stop"></i> Stop Job
+                    </button>
+                    <button type="button" id="delete-btn" class="btn btn-danger" onclick="deleteJob()">
+                        <i class="fas fa-trash"></i> Delete Job
+                    </button>
+                    <button type="button" class="btn btn-secondary" onclick="refreshData()">
+                        <i class="fas fa-sync"></i> Refresh
+                    </button>
+                    <a href="/jobs" class="btn btn-outline-primary">
+                        <i class="fas fa-arrow-left"></i> Back to Jobs
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Details Tabs -->
+        <ul class="nav nav-tabs" id="job-tabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="overview-tab" data-bs-toggle="tab" data-bs-target="#overview" type="button" role="tab">
+                    <i class="fas fa-chart-line"></i> Overview
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="pages-tab" data-bs-toggle="tab" data-bs-target="#pages" type="button" role="tab">
+                    <i class="fas fa-file-alt"></i> Crawled Pages
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="config-tab" data-bs-toggle="tab" data-bs-target="#config" type="button" role="tab">
+                    <i class="fas fa-cog"></i> Configuration
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="logs-tab" data-bs-toggle="tab" data-bs-target="#logs" type="button" role="tab">
+                    <i class="fas fa-terminal"></i> Logs
+                </button>
+            </li>
+        </ul>
+
+        <div class="tab-content" id="job-tabs-content">
+            <!-- Overview Tab -->
+            <div class="tab-pane fade show active" id="overview" role="tabpanel">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h5>Job Timeline</h5>
+                        <div class="timeline">
+                            <div class="timeline-item">
+                                <strong>Created:</strong> <span id="created-time">-</span>
+                            </div>
+                            <div class="timeline-item">
+                                <strong>Started:</strong> <span id="started-time">-</span>
+                            </div>
+                            <div class="timeline-item">
+                                <strong>Finished:</strong> <span id="finished-time">-</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <h5>Performance Metrics</h5>
+                        <div class="metrics">
+                            <div class="metric-item">
+                                <strong>Crawl Rate:</strong> <span id="crawl-rate">-</span> pages/sec
+                            </div>
+                            <div class="metric-item">
+                                <strong>Total Pages Stored:</strong> <span id="total-stored">-</span>
+                            </div>
+                            <div class="metric-item">
+                                <strong>Errors:</strong> <span id="error-count">0</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pages Tab -->
+            <div class="tab-pane fade" id="pages" role="tabpanel">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5>Crawled Pages</h5>
+                    <button class="btn btn-sm btn-outline-primary" onclick="loadPages()">
+                        <i class="fas fa-sync"></i> Refresh
+                    </button>
+                </div>
+                <div id="pages-list" class="pages-container">
+                    <div class="text-center p-4">
+                        <i class="fas fa-spinner fa-spin fa-2x"></i>
+                        <p class="mt-2">Loading pages...</p>
+                    </div>
+                </div>
+                <nav id="pages-pagination" class="mt-3">
+                    <!-- Pagination will be inserted here -->
+                </nav>
+            </div>
+
+            <!-- Configuration Tab -->
+            <div class="tab-pane fade" id="config" role="tabpanel">
+                <h5>Crawl Configuration</h5>
+                <div id="config-details" class="config-container">
+                    <!-- Configuration will be loaded here -->
+                </div>
+            </div>
+
+            <!-- Logs Tab -->
+            <div class="tab-pane fade" id="logs" role="tabpanel">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5>Crawl Logs</h5>
+                    <button class="btn btn-sm btn-outline-primary" onclick="loadLogs()">
+                        <i class="fas fa-sync"></i> Refresh
+                    </button>
+                </div>
+                <div class="log-container" id="log-content">
+                    Loading logs...
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let jobId = null;
+        let currentPage = 0;
+        const pageSize = 20;
+
+        // Get job ID from URL
+        function getJobIdFromURL() {
+            const pathParts = window.location.pathname.split('/');
+            return pathParts[pathParts.length - 1];
+        }
+
+        // Format timestamp
+        function formatTimestamp(timestamp) {
+            if (!timestamp) return '-';
+            const date = new Date(timestamp);
+            return date.toLocaleString();
+        }
+
+        // Format duration
+        function formatDuration(seconds) {
+            if (!seconds) return '-';
+            const hours = Math.floor(seconds / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            const secs = Math.floor(seconds % 60);
+            
+            if (hours > 0) {
+                return `${hours}h ${minutes}m ${secs}s`;
+            } else if (minutes > 0) {
+                return `${minutes}m ${secs}s`;
+            } else {
+                return `${secs}s`;
+            }
+        }
+
+        // Update progress ring
+        function updateProgressRing(percentage) {
+            const circumference = 2 * Math.PI * 52;
+            const offset = circumference - (percentage / 100) * circumference;
+            
+            document.querySelector('.progress-ring .progress').style.strokeDasharray = `${circumference} ${circumference}`;
+            document.querySelector('.progress-ring .progress').style.strokeDashoffset = offset;
+            document.getElementById('progress-text').textContent = `${Math.round(percentage)}%`;
+        }
+
+        // Load job details
+        async function loadJobDetails() {
+            try {
+                const response = await fetch(`/api/crawl/${jobId}/stats`);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const stats = await response.json();
+                
+                // Update header
+                document.getElementById('job-url').textContent = stats.params.start_url || stats.params.url;
+                document.getElementById('job-id').textContent = `Job ID: ${stats.job_id}`;
+                
+                // Update status
+                const statusElement = document.getElementById('job-status');
+                statusElement.textContent = stats.status.charAt(0).toUpperCase() + stats.status.slice(1);
+                statusElement.className = `card-text status-${stats.status}`;
+                
+                // Update stats
+                document.getElementById('pages-crawled').textContent = stats.pages_crawled;
+                document.getElementById('pages-found').textContent = stats.pages_found;
+                document.getElementById('total-stored').textContent = stats.total_pages_stored;
+                document.getElementById('error-count').textContent = stats.errors.length;
+                
+                // Update progress ring
+                const progress = stats.pages_found > 0 ? (stats.pages_crawled / stats.pages_found) * 100 : 0;
+                updateProgressRing(progress);
+                
+                // Update timeline
+                document.getElementById('created-time').textContent = formatTimestamp(stats.created_at);
+                document.getElementById('started-time').textContent = formatTimestamp(stats.started_at);
+                document.getElementById('finished-time').textContent = formatTimestamp(stats.finished_at);
+                
+                // Update duration and rate
+                if (stats.duration_seconds) {
+                    document.getElementById('job-duration').textContent = formatDuration(stats.duration_seconds);
+                    if (stats.crawl_rate) {
+                        document.getElementById('crawl-rate').textContent = stats.crawl_rate.toFixed(2);
+                    }
+                } else if (stats.started_at) {
+                    // Calculate running duration
+                    const startTime = new Date(stats.started_at);
+                    const now = new Date();
+                    const runningSeconds = (now - startTime) / 1000;
+                    document.getElementById('job-duration').textContent = formatDuration(runningSeconds);
+                    
+                    if (runningSeconds > 0 && stats.pages_crawled > 0) {
+                        const rate = stats.pages_crawled / runningSeconds;
+                        document.getElementById('crawl-rate').textContent = rate.toFixed(2);
+                    }
+                }
+                
+                // Update button states
+                const stopBtn = document.getElementById('stop-btn');
+                const deleteBtn = document.getElementById('delete-btn');
+                
+                if (stats.status === 'running') {
+                    stopBtn.style.display = 'inline-block';
+                } else {
+                    stopBtn.style.display = 'none';
+                }
+                
+                // Load configuration
+                loadConfiguration(stats.params);
+                
+            } catch (error) {
+                console.error('Error loading job details:', error);
+                alert('Failed to load job details: ' + error.message);
+            }
+        }
+
+        // Load configuration
+        function loadConfiguration(params) {
+            const configContainer = document.getElementById('config-details');
+            let configHtml = '';
+            
+            for (const [key, value] of Object.entries(params)) {
+                if (key === 'extra_http_headers' && typeof value === 'object') {
+                    configHtml += `
+                        <div class="config-item">
+                            <div class="config-label">${key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</div>
+                            <div class="config-value">${JSON.stringify(value, null, 2)}</div>
+                        </div>
+                    `;
+                } else {
+                    configHtml += `
+                        <div class="config-item">
+                            <div class="config-label">${key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</div>
+                            <div class="config-value">${Array.isArray(value) ? value.join(', ') : value}</div>
+                        </div>
+                    `;
+                }
+            }
+            
+            configContainer.innerHTML = configHtml;
+        }
+
+        // Load pages
+        async function loadPages(page = 0) {
+            try {
+                const response = await fetch(`/api/crawl/${jobId}/pages?limit=${pageSize}&offset=${page * pageSize}`);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                const pagesContainer = document.getElementById('pages-list');
+                
+                if (data.pages.length === 0) {
+                    pagesContainer.innerHTML = '<div class="text-center p-4"><p>No pages crawled yet.</p></div>';
+                    return;
+                }
+                
+                let pagesHtml = '';
+                data.pages.forEach(page => {
+                    pagesHtml += `
+                        <div class="page-item">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <strong>${page.url || 'Unknown URL'}</strong>
+                                    <div class="small text-muted">
+                                        Status: ${page.status || 'Unknown'} | 
+                                        Size: ${page.content_length || 'Unknown'} bytes |
+                                        Type: ${page.content_type || 'Unknown'}
+                                    </div>
+                                </div>
+                                <div>
+                                    <a href="/library/${jobId}/${page.id}" class="btn btn-sm btn-outline-primary" target="_blank">
+                                        <i class="fas fa-external-link-alt"></i> View
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                pagesContainer.innerHTML = pagesHtml;
+                
+                // Update pagination
+                updatePagination(data.total, page);
+                
+            } catch (error) {
+                console.error('Error loading pages:', error);
+                document.getElementById('pages-list').innerHTML = 
+                    '<div class="text-center p-4"><p class="text-danger">Failed to load pages.</p></div>';
+            }
+        }
+
+        // Update pagination
+        function updatePagination(total, currentPage) {
+            const totalPages = Math.ceil(total / pageSize);
+            const paginationContainer = document.getElementById('pages-pagination');
+            
+            if (totalPages <= 1) {
+                paginationContainer.innerHTML = '';
+                return;
+            }
+            
+            let paginationHtml = '<nav><ul class="pagination justify-content-center">';
+            
+            // Previous button
+            paginationHtml += `
+                <li class="page-item ${currentPage === 0 ? 'disabled' : ''}">
+                    <a class="page-link" href="#" onclick="loadPages(${currentPage - 1}); return false;">Previous</a>
+                </li>
+            `;
+            
+            // Page numbers
+            for (let i = 0; i < totalPages; i++) {
+                paginationHtml += `
+                    <li class="page-item ${i === currentPage ? 'active' : ''}">
+                        <a class="page-link" href="#" onclick="loadPages(${i}); return false;">${i + 1}</a>
+                    </li>
+                `;
+            }
+            
+            // Next button
+            paginationHtml += `
+                <li class="page-item ${currentPage === totalPages - 1 ? 'disabled' : ''}">
+                    <a class="page-link" href="#" onclick="loadPages(${currentPage + 1}); return false;">Next</a>
+                </li>
+            `;
+            
+            paginationHtml += '</ul></nav>';
+            paginationContainer.innerHTML = paginationHtml;
+        }
+
+        // Load logs
+        async function loadLogs() {
+            try {
+                const response = await fetch(`/api/crawl/${jobId}/logs`);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const logs = await response.text();
+                const logContainer = document.getElementById('log-content');
+                
+                if (logs.trim()) {
+                    logContainer.textContent = logs;
+                } else {
+                    logContainer.textContent = 'No logs available.';
+                }
+                
+                // Auto-scroll to bottom
+                logContainer.scrollTop = logContainer.scrollHeight;
+                
+            } catch (error) {
+                console.error('Error loading logs:', error);
+                document.getElementById('log-content').textContent = 'Failed to load logs.';
+            }
+        }
+
+        // Stop job
+        async function stopJob() {
+            if (!confirm('Are you sure you want to stop this job?')) return;
+            
+            try {
+                const response = await fetch(`/api/crawl/${jobId}/stop`, {
+                    method: 'POST'
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                alert('Job stopped successfully');
+                refreshData();
+                
+            } catch (error) {
+                console.error('Error stopping job:', error);
+                alert('Failed to stop job: ' + error.message);
+            }
+        }
+
+        // Delete job
+        async function deleteJob() {
+            if (!confirm('Are you sure you want to delete this job? This will remove all crawled data.')) return;
+            
+            try {
+                const response = await fetch(`/api/crawl/${jobId}`, {
+                    method: 'DELETE'
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                alert('Job deleted successfully');
+                window.location.href = '/jobs';
+                
+            } catch (error) {
+                console.error('Error deleting job:', error);
+                alert('Failed to delete job: ' + error.message);
+            }
+        }
+
+        // Refresh all data
+        function refreshData() {
+            loadJobDetails();
+            
+            // Refresh active tab content
+            const activeTab = document.querySelector('.nav-link.active').id;
+            if (activeTab === 'pages-tab') {
+                loadPages(currentPage);
+            } else if (activeTab === 'logs-tab') {
+                loadLogs();
+            }
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            jobId = getJobIdFromURL();
+            if (!jobId) {
+                alert('Invalid job ID');
+                window.location.href = '/jobs';
+                return;
+            }
+            
+            loadJobDetails();
+            
+            // Load content when tabs are clicked
+            document.getElementById('pages-tab').addEventListener('click', () => loadPages(0));
+            document.getElementById('logs-tab').addEventListener('click', loadLogs);
+            
+            // Auto-refresh for running jobs every 5 seconds
+            setInterval(() => {
+                const status = document.getElementById('job-status').textContent.toLowerCase();
+                if (status === 'running') {
+                    loadJobDetails();
+                }
+            }, 5000);
+        });
+    </script>
+</body>
+</html>

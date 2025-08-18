@@ -48,7 +48,7 @@ class JobStatus(str, Enum):
 
 class CrawlStatusDetail(BaseModel):
     """Detailed status information for a crawl job"""
-    state: Literal["queued","running","paused","done","error","canceled"]
+    state: Literal["queued","running","paused","completed","error","canceled"]
     started_at: Optional[str] = None
     finished_at: Optional[str] = None
     elapsed_sec: float = 0

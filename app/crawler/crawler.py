@@ -510,7 +510,7 @@ class SiteCrawler:
         try:
             job = await self.storage.load_job(self.job_id)
             if job and job.status not in ['error', 'canceled']:
-                await self._update_status("done")
+                await self._update_status("completed")
                 
         except Exception as e:
             logger.error(f"Error finalizing status for job {self.job_id}: {e}")

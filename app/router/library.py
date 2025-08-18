@@ -86,9 +86,12 @@ async def domain_crawls(request: Request, domain_name: str, _: AuthRequired):
                         with open(manifest_file, 'r') as f:
                             manifest = json.load(f)
                         
-                        # Count pages
+                        # Count pages efficiently
                         pages_dir = crawl_dir / 'pages'
-                        page_count = len(list(pages_dir.glob('*.json'))) if pages_dir.exists() else 0
+                        page_count = 0
+                        if pages_dir.exists():
+                            # More efficient counting without loading files into memory
+                            page_count = sum(1 for _ in pages_dir.glob('*.json'))
                         
                         crawls.append({
                             'folder_name': crawl_dir.name,
@@ -121,7 +124,10 @@ async def domain_crawls(request: Request, domain_name: str, _: AuthRequired):
 
 
 @router.get('/crawl/{domain_name}/{folder_name}', response_class=HTMLResponse, include_in_schema=False)
-async def crawl_details(request: Request, domain_name: str, folder_name: str, _: AuthRequired):
+async def crawl_details(request: Request, domain_name: str, folder_name: str, 
+                       page: int = Query(1, ge=1), 
+                       limit: int = Query(50, ge=1, le=200),
+                       _: AuthRequired = None):
     """Display details and pages for a specific crawl."""
     storage = get_storage()
     
@@ -138,11 +144,25 @@ async def crawl_details(request: Request, domain_name: str, folder_name: str, _:
         with open(manifest_file, 'r') as f:
             manifest = json.load(f)
         
-        # Get all pages
+        # Get pages with pagination
         pages = []
+        total_pages_count = 0
         pages_dir = crawl_dir / 'pages'
+        
         if pages_dir.exists():
-            for page_file in pages_dir.glob('*.json'):
+            # Get all page files and count them efficiently
+            page_files = list(pages_dir.glob('*.json'))
+            total_pages_count = len(page_files)
+            
+            # Sort page files by modification time (newest first) - avoid loading JSON for sorting
+            page_files.sort(key=lambda f: f.stat().st_mtime, reverse=True)
+            
+            # Apply pagination
+            offset = (page - 1) * limit
+            paginated_files = page_files[offset:offset + limit]
+            
+            # Load only the paginated page data
+            for page_file in paginated_files:
                 try:
                     with open(page_file, 'r') as f:
                         page_data = json.load(f)
@@ -161,8 +181,10 @@ async def crawl_details(request: Request, domain_name: str, folder_name: str, _:
                 except Exception:
                     continue
         
-        # Sort by depth, then by URL
-        pages.sort(key=lambda x: (x['depth'], x['url']))
+        # Calculate pagination info
+        total_pagination_pages = (total_pages_count + limit - 1) // limit if total_pages_count > 0 else 1
+        has_next = page < total_pagination_pages
+        has_prev = page > 1
         
         context = {
             'request': request,
@@ -171,7 +193,15 @@ async def crawl_details(request: Request, domain_name: str, folder_name: str, _:
             'folder_name': folder_name,
             'manifest': manifest,
             'pages': pages,
-            'crawl_dir': crawl_dir
+            'crawl_dir': crawl_dir,
+            # Pagination info
+            'current_page': page,
+            'total_pages': total_pagination_pages,
+            'has_next': has_next,
+            'has_prev': has_prev,
+            'total_pages_count': total_pages_count,
+            'showing_count': len(pages),
+            'page_limit': limit
         }
         return templates.TemplateResponse(request=request, name='library/crawl.html', context=context)
         

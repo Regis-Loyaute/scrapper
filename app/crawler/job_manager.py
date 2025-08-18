@@ -54,7 +54,7 @@ class JobManager:
                 job_id=job_id,
                 params=crawler_params,
                 status=JobStatus.PENDING.value,
-                created_at=datetime.now().isoformat(),
+                created_at=datetime.now().astimezone().isoformat(),
                 pages_crawled=0,
                 pages_found=0,
                 pages_remaining=0,
@@ -87,7 +87,7 @@ class JobManager:
                 
                 # Update job status
                 job.status = JobStatus.RUNNING.value
-                job.started_at = datetime.now().isoformat()
+                job.started_at = datetime.now().astimezone().isoformat()
                 await self._storage.save_job(job)
                 
                 # Start crawling in background
@@ -129,7 +129,7 @@ class JobManager:
             
             # Update final status
             job.status = JobStatus.COMPLETED.value
-            job.finished_at = datetime.now().isoformat()
+            job.finished_at = datetime.now().astimezone().isoformat()
             job.pages_crawled = result.get('total_pages', 0)
             await self._storage.save_job(job)
             
@@ -140,7 +140,7 @@ class JobManager:
             job = self._jobs[job_id]
             job.status = JobStatus.FAILED.value
             job.error = str(e)
-            job.finished_at = datetime.now().isoformat()
+            job.finished_at = datetime.now().astimezone().isoformat()
             await self._storage.save_job(job)
         
         finally:
@@ -165,7 +165,7 @@ class JobManager:
             
             # Update job status
             job.status = JobStatus.STOPPED.value
-            job.finished_at = datetime.now().isoformat()
+            job.finished_at = datetime.now().astimezone().isoformat()
             await self._storage.save_job(job)
             
             logger.info(f"Stopped crawl job {job_id}")
@@ -247,7 +247,12 @@ class JobManager:
                 if job_id in self._jobs and self._jobs[job_id].status == JobStatus.RUNNING.value:
                     await self.stop_job(job_id)
                 
-                # Delete from storage
+                # Remove from crawler instances to prevent recreation
+                if job_id in self._crawlers:
+                    await self._crawlers[job_id].stop()
+                    del self._crawlers[job_id]
+                
+                # Delete from storage (use the async version explicitly)
                 await self._storage.delete_job(job_id)
                 
                 # Remove from memory
@@ -269,24 +274,95 @@ class JobManager:
         
         try:
             # Get additional stats from storage
-            pages = await self._storage.list_pages(job_id)
+            try:
+                pages = self._storage.list_pages(job_id)
+                total_pages_stored = len(pages) if pages else 0
+            except Exception as e:
+                logger.warning(f"Could not get page count for job {job_id}: {e}")
+                total_pages_stored = job.pages_crawled  # fallback to job's count
             
             return {
                 'job_id': job_id,
                 'status': job.status,
-                'created_at': job.created_at.isoformat(),
-                'started_at': job.started_at.isoformat() if job.started_at else None,
-                'finished_at': job.finished_at.isoformat() if job.finished_at else None,
+                'created_at': job.created_at.isoformat() if hasattr(job.created_at, 'isoformat') else job.created_at,
+                'started_at': job.started_at.isoformat() if job.started_at and hasattr(job.started_at, 'isoformat') else job.started_at,
+                'finished_at': job.finished_at.isoformat() if job.finished_at and hasattr(job.finished_at, 'isoformat') else job.finished_at,
                 'pages_crawled': job.pages_crawled,
                 'pages_found': job.pages_found,
                 'pages_remaining': job.pages_remaining,
-                'total_pages_stored': len(pages),
-                'errors': job.errors,
+                'total_pages_stored': total_pages_stored,
+                'errors': job.errors if job.errors else [],
                 'params': job.params
             }
         except Exception as e:
             logger.error(f"Failed to get stats for job {job_id}: {e}")
             return None
+
+    async def fix_stuck_jobs(self) -> int:
+        """Fix jobs that are stuck in running state but have no active crawler"""
+        fixed_count = 0
+        async with self._lock:
+            for job_id, job in list(self._jobs.items()):
+                if job.status == JobStatus.RUNNING.value and job_id not in self._crawlers:
+                    logger.info(f"Fixing stuck job {job_id}")
+                    
+                    # Check if there are actually pages crawled
+                    try:
+                        pages = self._storage.list_pages(job_id)
+                        actual_pages_count = len(pages)
+                        
+                        if actual_pages_count > 0:
+                            # Job has pages, mark as completed
+                            job.status = JobStatus.COMPLETED.value
+                            job.pages_crawled = actual_pages_count
+                            job.finished_at = datetime.now().astimezone().isoformat()
+                            logger.info(f"Marked stuck job {job_id} as completed ({actual_pages_count} pages)")
+                        else:
+                            # No pages crawled, mark as failed
+                            job.status = JobStatus.FAILED.value
+                            job.error = "Job appears to have been interrupted without completing"
+                            job.finished_at = datetime.now().astimezone().isoformat()
+                            logger.info(f"Marked stuck job {job_id} as failed (no pages found)")
+                        
+                        await self._storage.save_job(job)
+                        fixed_count += 1
+                        
+                    except Exception as e:
+                        logger.error(f"Failed to fix stuck job {job_id}: {e}")
+            
+            # Also scan storage for stuck jobs not in memory
+            try:
+                all_jobs = await self._storage.list_job_summaries()
+                for summary in all_jobs:
+                    if summary.state == 'running' and summary.job_id not in self._jobs:
+                        job_id = summary.job_id
+                        logger.info(f"Found stuck job in storage: {job_id}")
+                        
+                        # Load the job
+                        job = await self._storage.load_job(job_id)
+                        if job and job.status == JobStatus.RUNNING.value:
+                            pages = self._storage.list_pages(job_id)
+                            actual_pages_count = len(pages)
+                            
+                            if actual_pages_count > 0:
+                                job.status = JobStatus.COMPLETED.value
+                                job.pages_crawled = actual_pages_count
+                                job.finished_at = datetime.now().astimezone().isoformat()
+                                logger.info(f"Fixed stuck storage job {job_id} as completed ({actual_pages_count} pages)")
+                            else:
+                                job.status = JobStatus.FAILED.value
+                                job.error = "Job appears to have been interrupted without completing"
+                                job.finished_at = datetime.now().astimezone().isoformat()
+                                logger.info(f"Fixed stuck storage job {job_id} as failed (no pages found)")
+                            
+                            await self._storage.save_job(job)
+                            self._jobs[job_id] = job
+                            fixed_count += 1
+                            
+            except Exception as e:
+                logger.error(f"Failed to scan storage for stuck jobs: {e}")
+        
+        return fixed_count
 
 
 # Global job manager instance

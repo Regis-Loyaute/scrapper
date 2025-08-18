@@ -47,6 +47,17 @@ async def jobs_page(request: Request, _: AuthRequired):
     return templates.TemplateResponse(request=request, name='jobs.html', context=context)
 
 
+@router.get('/jobs/{job_id}', response_class=HTMLResponse, include_in_schema=False)
+async def job_detail_page(request: Request, job_id: str, _: AuthRequired):
+    """Display the detailed job view page."""
+    context = {
+        'request': request,
+        'revision': settings.REVISION,
+        'job_id': job_id,
+    }
+    return templates.TemplateResponse(request=request, name='job_detail.html', context=context)
+
+
 @router.get('/job', response_class=HTMLResponse, include_in_schema=False)
 async def job_details_page(request: Request, _: AuthRequired):
     """Display the job details page."""

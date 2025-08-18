@@ -366,17 +366,20 @@
     function createJobActions(job) {
       const actions = [];
       
+      // For running jobs: Stop button + Details
       if (job.status === 'running') {
         actions.push(`<button onclick="stopJob('${job.job_id}')" class="secondary">⏹️ Stop</button>`);
-      }
-      
-      actions.push(`<button onclick="viewJob('${job.job_id}')" class="outline">👁️ Details</button>`);
-      
-      if (job.status === 'completed' || job.status === 'done') {
-        actions.push(`<button onclick="viewInLibrary('${job.job_id}')" class="primary">📚 View Results</button>`);
-      }
-      
-      if (job.status !== 'running') {
+        actions.push(`<button onclick="viewJob('${job.job_id}')" class="outline">👁️ Details</button>`);
+      } 
+      // For completed jobs: Details as primary button + View Results + Delete
+      else if (job.status === 'completed' || job.status === 'done') {
+        actions.push(`<button onclick="viewJob('${job.job_id}')" class="primary">👁️ Details</button>`);
+        actions.push(`<button onclick="viewInLibrary('${job.job_id}')" class="secondary">📚 View Results</button>`);
+        actions.push(`<button onclick="deleteJob('${job.job_id}')" class="contrast">🗑️ Delete</button>`);
+      } 
+      // For other statuses (failed, stopped, pending): Details + Delete
+      else {
+        actions.push(`<button onclick="viewJob('${job.job_id}')" class="primary">👁️ Details</button>`);
         actions.push(`<button onclick="deleteJob('${job.job_id}')" class="contrast">🗑️ Delete</button>`);
       }
 
@@ -440,7 +443,7 @@
     }
 
     function viewJob(jobId) {
-      window.open(`/job?id=${jobId}`, '_blank');
+      window.open(`/jobs/${jobId}`, '_blank');
     }
 
     function viewInLibrary(jobId) {
